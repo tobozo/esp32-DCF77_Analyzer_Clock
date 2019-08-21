@@ -60,7 +60,7 @@
     - Crypto code based on    : https://github.com/FroggySoft/AlarmClock 
     - Weather code based on   : http://arduino-projects4u.com/home-weather-station/
     - Erik de Ruiter          : https://www.hackster.io/edr1924
-    - Brett Oliver            : http://home.btconnect.com/brettoliver1/
+    - Brett Oliver            : http://www.brettoliver.org.uk/
     - Joop Tap                : http://www.jooptap.nl
     - Thijs Ellenbaas         : http://thijs.elenbaas.net/2012/04/arduino-dcf77-radio-clock-receiver-hardware-2/
     - Mathias Dalheimer       : https://github.com/roddi/DCF77-Arduino/blob/master/DCF77Servoclock/DCF77.h
