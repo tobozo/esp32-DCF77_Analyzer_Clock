@@ -1,5 +1,5 @@
 # esp32-DCF77_Analyzer_Clock
-An ESP32 TFT interpretation of the @deruiter's DCF77-Analyzer-Clock-V2.0
+An ESP32 TFT interpretation of the @deruiter's [DCF77-Analyzer-Clock-V2.0](https://github.com/deruiter/DCF77-Analyzer-Clock-V2.0)
 
 
 [![image](https://raw.githubusercontent.com/tobozo/esp32-DCF77_Analyzer_Clock/master/img/dcf77-demo.gif)](https://twitter.com/TobozoTagada/status/1163339957538344960?s=20)
