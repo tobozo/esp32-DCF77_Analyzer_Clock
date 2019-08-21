@@ -28,8 +28,6 @@ CREDITS:
   Although the changes I made are far from optimistic, this code has wisdom DNA in its roots!
   
   Without the incredible work of these geniuses I would not have known where to start and how to write those credits :)
-  I ended up writing my own code (using bits and pieces of their ideas) so I could understand what is happening...
-  My code is far from efficient or advanced but it does work and I know what is going on.
 
 Author:
 -------
