@@ -4,12 +4,13 @@
 #define WEATHER_SIZE      82
 #define WEATHER_INFO_SIZE  3
 
-// from UI.h 
+// from UI.h
 extern void updateScroll( String text );
 
 int fourdayforecast = 0;
 int twodayforecast = 0;
 int significantweather[60] = {0};
+String weathermemory[60];
 int mWeatherData[WEATHER_SIZE];
 byte mWeatherArea;
 byte mWeatherSection;
@@ -34,6 +35,12 @@ typedef struct {
   const char* name;
 } cityByCountry;
 
+typedef struct {
+  const char* label;
+  SpriteSheetIcon icon;
+} iconByLabel;
+
+
 countryBycode France       = {"F",   "France"};
 countryBycode Belgium      = {"B",   "Belgium"};
 countryBycode Switzerland  = {"CH",  "Switzerland"};
@@ -55,30 +62,116 @@ countryBycode Ireland      = {"IRL", "Ireland"};
 countryBycode Poland       = {"PL",  "Poland"};
 countryBycode Croatia      = {"HR",  "Croatia"};
 
-cityByCountry cities[] = {
-  {France, "Bordeaux"}, {France, "La Rochelle"}, {France, "Paris"}, {France, "Brest"}, {France, "Clermont-Ferrand"}, {France, "Beziers"}, {Belgium, "Bruxelles"}, {France, "Dijon"}, {France, "Marseille"}, {France, "Lyon"}, {France, "Grenoble"}, 
-  {Switzerland, "La Chaux de Fonds"}, {Germany, "Frankfurt am Main"}, {Germany, "Trier"}, {Germany, "Duisburg"}, {GreatBritain, "Swansea"}, {GreatBritain, "Manchester"}, {France, "Le Havre"}, {GreatBritain, "London"}, {Germany, "Bremerhaven"}, 
-  {Denmark, "Herning"}, {Denmark, "Arhus"}, {Germany, "Hannover"}, {Denmark, "Copenhagen"}, {Germany, "Rostock"}, {Germany, "Ingolstadt"}, {Germany, "Muenchen"}, {Italy, "I Bolzano"}, {Germany, "Nuernberg"}, {Germany, "Leipzig"}, 
+const cityByCountry cities[] = {
+  {France, "Bordeaux"}, {France, "La Rochelle"}, {France, "Paris"}, {France, "Brest"}, {France, "Clermont-Ferrand"}, {France, "Beziers"}, {Belgium, "Bruxelles"}, {France, "Dijon"}, {France, "Marseille"}, {France, "Lyon"}, {France, "Grenoble"},
+  {Switzerland, "La Chaux de Fonds"}, {Germany, "Frankfurt am Main"}, {Germany, "Trier"}, {Germany, "Duisburg"}, {GreatBritain, "Swansea"}, {GreatBritain, "Manchester"}, {France, "Le Havre"}, {GreatBritain, "London"}, {Germany, "Bremerhaven"},
+  {Denmark, "Herning"}, {Denmark, "Arhus"}, {Germany, "Hannover"}, {Denmark, "Copenhagen"}, {Germany, "Rostock"}, {Germany, "Ingolstadt"}, {Germany, "Muenchen"}, {Italy, "I Bolzano"}, {Germany, "Nuernberg"}, {Germany, "Leipzig"},
   {Germany, "Erfurt"}, {Switzerland, "Lausanne"}, {Switzerland, "Zuerich"}, {Switzerland, "Adelboden"}, {Switzerland, "Sion"}, {Switzerland, "Glarus"}, {Switzerland, "Davos"}, {Germany, "Kassel"}, {Switzerland, "Locarno"}, {Italy, "Sestriere"},
-  {Italy, "Milano"}, {Italy, "Roma"}, {Netherlands, "Amsterdam"}, {Italy, "Genova"}, {Italy, "Venezia"}, {Germany, "Strasbourg"}, {Austria, "Klagenfurt"}, {Austria, "Innsbruck"}, {Austria, "Salzburg"}, {Slovakia, "Wien/Bratislava"}, 
+  {Italy, "Milano"}, {Italy, "Roma"}, {Netherlands, "Amsterdam"}, {Italy, "Genova"}, {Italy, "Venezia"}, {Germany, "Strasbourg"}, {Austria, "Klagenfurt"}, {Austria, "Innsbruck"}, {Austria, "Salzburg"}, {Slovakia, "Wien/Bratislava"},
   {Czechia, "Praha"}, {Czechia, "Decin"}, {Germany, "Berlin"}, {Sweden, "Gothenburg"}, {Sweden, "Stockholm"}, {Sweden, "Kalmar"}, {Sweden, "Joenkoeping"}, {Germany, "Donaueschingen"}, {Norway, "Oslo"}, {Germany, "Stuttgart"},
-  {Italy, "Napoli"}, {Italy, "Ancona"}, {Italy, "Bari"}, {Hungary, "Budapest"}, {Spain, "Madrid"}, {Spain, "Bilbao"}, {Italy, "Palermo"}, {Spain, "Palma de Mallorca"}, {Spain, "Valencia"}, {Spain, "Barcelona"}, {Andorra, "Andorra"}, 
+  {Italy, "Napoli"}, {Italy, "Ancona"}, {Italy, "Bari"}, {Hungary, "Budapest"}, {Spain, "Madrid"}, {Spain, "Bilbao"}, {Italy, "Palermo"}, {Spain, "Palma de Mallorca"}, {Spain, "Valencia"}, {Spain, "Barcelona"}, {Andorra, "Andorra"},
   {Spain, "Sevilla"}, {Portugal, "Lissabon"}, {Italy, "Sassari"}, {Spain, "Gijon"}, {Ireland, "Galway"}, {Ireland, "Dublin"}, {GreatBritain, "Glasgow"}, {Norway, "Stavanger"}, {Norway, "Trondheim"}, {Sweden, "Sundsvall"}, {Poland, "Gdansk"},
-  {Poland, "Warszawa"}, {Poland, "Krakow"}, {Sweden, "Umea"}, {Sweden, "Oestersund"}, {Switzerland, "Samedan"}, {Croatia, "Zagreb"}, {Switzerland, "Zermatt"}, {Croatia, "Split"} 
+  {Poland, "Warszawa"}, {Poland, "Krakow"}, {Sweden, "Umea"}, {Sweden, "Oestersund"}, {Switzerland, "Samedan"}, {Croatia, "Zagreb"}, {Switzerland, "Zermatt"}, {Croatia, "Split"}
 };
 
-String weather[]       = {"Reserved", "Sunny", "Partly clouded", "Mostly clouded", "Overcast", "Heat storms", "Heavy rain", "Snow", "Fog", "Sleet", "Rain showers", "light rain",
-                         "Snow showers", "Frontal storms", "Stratus cloud", "Sleet storms" };
-String heavyweather[]  = {"None", "Heavy Weather 24 hrs.", "Heavy weather Day", "Heavy weather Night", "Storm 24hrs.", "Storm Day", "Storm Night",
-                         "Wind gusts Day", "Wind gusts Night", "Icy rain morning", "Icy rain evening", "Icy rain night", "Fine dust", "Ozon", "Radiation", "High water" };
-String probprecip[]    = {"0 %", "15 %", "30 %", "45 %", "60 %", "75 %", "90 %", "100 %"};
-String winddirection[] = {"N", "NO", "O", "SO", "S", "SW", "W", "NW", "Changeable", "Foen", "Biese N/O", "Mistral N", "Scirocco S", "Tramont W", "reserved", "reserved" };
-String windstrength[]  = { "0", "0-2", "3-4", "5-6", "7", "8", "9", ">=10"};
-String anomaly1[]      = {"Same Weather ", "Jump 1 ", "Jump 2 ", "Jump 3 "};
-String anomaly2[]      = {"0-2 hrs", "2-4 hrs", "5-6 hrs", "7-8 hrs"};
+
+iconByLabel weather[] = {
+  { "Reserved",       na },
+  { "Sunny",          day_sunny },
+  { "Partly clouded", cloud },
+  { "Mostly clouded", cloudy },
+  { "Overcast",       cloud_down },
+  { "Heat storms",    storm_warning },
+  { "Heavy rain",     rain },
+  { "Snow",           snow },
+  { "Fog",            fog },
+  { "Sleet",          sleet },
+  { "Rain showers",   showers },
+  { "light rain",     rain_mix },
+  { "Snow showers",   snow_wind },
+  { "Frontal storms", storm_showers },
+  { "Stratus cloud",  cloud_up },
+  { "Sleet storms",   day_sleet_storm }
+};
+
+
+iconByLabel heavyweather[] = {
+  { "None",                  na },
+  { "Heavy Weather 24 hrs.", na },
+  { "Heavy weather Day",     na },
+  { "Heavy weather Night",   na },
+  { "Storm 24hrs.",          na },
+  { "Storm Day",             day_storm_showers },
+  { "Storm Night",           night_storm_showers },
+  { "Wind gusts Day",        cloudy_gusts },
+  { "Wind gusts Night",      night_alt_cloudy_gusts },
+  { "Icy rain morning",      day_rain_mix },
+  { "Icy rain evening",      night_alt_rain_mix },
+  { "Icy rain night",        night_snow_wind },
+  { "Fine dust",             dust },
+  { "Ozon",                  raindrop },
+  { "Radiation",             wind_deg },
+  { "High water",            tsunami }
+};
+
+iconByLabel rainprobability[] = {
+  { "0 %",   humidity },
+  { "15 %",  humidity },
+  { "30 %",  humidity },
+  { "45 %",  humidity },
+  { "60 %",  humidity },
+  { "75 %",  humidity },
+  { "90 %",  humidity },
+  { "100 %", humidity }
+};
+
+iconByLabel winddirection[] = {
+  { "N",          direction_up },
+  { "NO",         direction_up_left },
+  { "O",          direction_left },
+  { "SO",         direction_down_left },
+  { "S",          direction_down },
+  { "SW",         direction_down_right },
+  { "W",          direction_right },
+  { "NW",         direction_up_right },
+  { "Changeable", nullicon },
+  { "Foen",       nullicon },
+  { "Biese N/O",  nullicon },
+  { "Mistral N",  nullicon },
+  { "Scirocco S", nullicon },
+  { "Tramont W",  nullicon },
+  { "reserved",   nullicon },
+  { "reserved",   nullicon }
+};
+
+iconByLabel windstrength[] = {
+  { "0",    wind_beaufort_0 },
+  { "0-2",  wind_beaufort_2 },
+  { "3-4",  wind_beaufort_4 },
+  { "5-6",  wind_beaufort_6 },
+  { "7",    wind_beaufort_7 },
+  { "8",    wind_beaufort_8 },
+  { "9",    wind_beaufort_9 },
+  { ">=10", wind_beaufort_10 }
+};
+
+iconByLabel anomaly1[] {
+  { "Same Weather ",  nullicon },
+  { "Jump 1 ",        nullicon },
+  { "Jump 2 ",        nullicon },
+  { "Jump 3 ",        nullicon }
+};
+
+iconByLabel anomaly2[] {
+  { "0-2 hrs",  nullicon },
+  { "2-4 hrs",  nullicon },
+  { "5-6 hrs",  nullicon },
+  { "7-8 hrs",  nullicon }
+};
+
 
 String meteodata;
-String weathermemory[60];
+
 
 /*
 countryBycode countries[] = {
@@ -186,7 +279,7 @@ byte getSection() {
 
 /// bit pattern for 0D,0E from 0B-0D
 const uint32_t mUintArrBitPattern12[] /*PROGMEM*/ = {
-  0x80000, //0b10000000000000000000, // 0D.3 
+  0x80000, //0b10000000000000000000, // 0D.3
   0x00010, //0b00000000000000010000, // 0B.4
   0x00008, //0b00000000000000001000, // 0B.3
   0x00100, //0b00000000000100000000, // 0C.0
@@ -204,106 +297,106 @@ const uint32_t mUintArrBitPattern12[] /*PROGMEM*/ = {
 /// 12-15 from 16-19 (time)
 /// </summary>
 const uint32_t mUintArrBitPattern30_1[] /*PROGMEM*/ = {
-  0x00000200, //0b00000000000000000000001000000000, // 17.1 
-  0x00000020, //0b00000000000000000000000000100000, // 16.5 
-  0x02000000, //0b00000010000000000000000000000000, // 19.1 
-  0x00000000, //0b00000000000000000000000000000000, // 1A.3 
-  0x00000000, //0b00000000000000000000000000000000, // 1A.5  
-  0x00000080, //0b00000000000000000000000010000000, // 16.7 
-  0x40000000, //0b01000000000000000000000000000000, // 19.6 
-  0x01000000, //0b00000001000000000000000000000000, // 19.0 
+  0x00000200, //0b00000000000000000000001000000000, // 17.1
+  0x00000020, //0b00000000000000000000000000100000, // 16.5
+  0x02000000, //0b00000010000000000000000000000000, // 19.1
+  0x00000000, //0b00000000000000000000000000000000, // 1A.3
+  0x00000000, //0b00000000000000000000000000000000, // 1A.5
+  0x00000080, //0b00000000000000000000000010000000, // 16.7
+  0x40000000, //0b01000000000000000000000000000000, // 19.6
+  0x01000000, //0b00000001000000000000000000000000, // 19.0
 
-  0x04000000, //0b00000100000000000000000000000000, // 19.2 
-  0x00000000, //0b00000000000000000000000000000000, // 1A.4  
-  0x00010000, //0b00000000000000010000000000000000, // 18.0 
-  0x00000000, //0b00000000000000000000000000000000, // 1A.2 
-  0x00400000, //0b00000000010000000000000000000000, // 18.6 
-  0x00000010, //0b00000000000000000000000000010000, // 16.4 
-  0x00200000, //0b00000000001000000000000000000000, // 18.5 
-  0x00080000, //0b00000000000010000000000000000000, // 18.3 
+  0x04000000, //0b00000100000000000000000000000000, // 19.2
+  0x00000000, //0b00000000000000000000000000000000, // 1A.4
+  0x00010000, //0b00000000000000010000000000000000, // 18.0
+  0x00000000, //0b00000000000000000000000000000000, // 1A.2
+  0x00400000, //0b00000000010000000000000000000000, // 18.6
+  0x00000010, //0b00000000000000000000000000010000, // 16.4
+  0x00200000, //0b00000000001000000000000000000000, // 18.5
+  0x00080000, //0b00000000000010000000000000000000, // 18.3
 
-  0x00004000, //0b00000000000000000100000000000000, // 17.6 
-  0x00000000, //0b00000000000000000000000000000000, // 1A.6 
-  0x00020000, //0b00000000000000100000000000000000, // 18.1 
-  0x00100000, //0b00000000000100000000000000000000, // 18.4 
-  0x00008000, //0b00000000000000001000000000000000, // 17.7 
-  0x00000040, //0b00000000000000000000000001000000, // 16.6 
-  0x00001000, //0b00000000000000000001000000000000, // 17.4 
-  0x00000400, //0b00000000000000000000010000000000, // 17.2 
+  0x00004000, //0b00000000000000000100000000000000, // 17.6
+  0x00000000, //0b00000000000000000000000000000000, // 1A.6
+  0x00020000, //0b00000000000000100000000000000000, // 18.1
+  0x00100000, //0b00000000000100000000000000000000, // 18.4
+  0x00008000, //0b00000000000000001000000000000000, // 17.7
+  0x00000040, //0b00000000000000000000000001000000, // 16.6
+  0x00001000, //0b00000000000000000001000000000000, // 17.4
+  0x00000400, //0b00000000000000000000010000000000, // 17.2
 
-  0x00000001, //0b00000000000000000000000000000001, // 16.0 
-  0x80000000, //0b10000000000000000000000000000000, // 19.7 
-  0x00000008, //0b00000000000000000000000000001000, // 16.3 
-  0x00000002, //0b00000000000000000000000000000010, // 16.1 
-  0x00040000, //0b00000000000001000000000000000000, // 18.2 
-  0x10000000  //0b00010000000000000000000000000000 // 19.4 
+  0x00000001, //0b00000000000000000000000000000001, // 16.0
+  0x80000000, //0b10000000000000000000000000000000, // 19.7
+  0x00000008, //0b00000000000000000000000000001000, // 16.3
+  0x00000002, //0b00000000000000000000000000000010, // 16.1
+  0x00040000, //0b00000000000001000000000000000000, // 18.2
+  0x10000000  //0b00010000000000000000000000000000 // 19.4
 };
 
 /// <summary>
 /// bit pattern for 12-15 from 1A (time2)
 /// </summary>
 const byte mUintArrBitPattern30_2[] /*PROGMEM*/ = {
-  0x00, //0b00000000,  // 17.1 
-  0x00, //0b00000000,  // 16.5 
-  0x00, //0b00000000,  // 19.1 
-  0x08, //0b00001000,  // 1A.3 
-  0x20, //0b00100000,  // 1A.5 
-  0x00, //0b00000000,  // 16.7 
-  0x00, //0b00000000,  // 19.6 
-  0x00, //0b00000000,  // 19.0 
+  0x00, //0b00000000,  // 17.1
+  0x00, //0b00000000,  // 16.5
+  0x00, //0b00000000,  // 19.1
+  0x08, //0b00001000,  // 1A.3
+  0x20, //0b00100000,  // 1A.5
+  0x00, //0b00000000,  // 16.7
+  0x00, //0b00000000,  // 19.6
+  0x00, //0b00000000,  // 19.0
 
-  0x00, //0b00000000,  // 19.2 
-  0x10, //0b00010000,  // 1A.4 
-  0x00, //0b00000000,  // 18.0 
-  0x04, //0b00000100,  // 1A.2 
-  0x00, //0b00000000,  // 18.6 
-  0x00, //0b00000000,  // 16.4 
-  0x00, //0b00000000,  // 18.5 
-  0x00, //0b00000000,  // 18.3 
+  0x00, //0b00000000,  // 19.2
+  0x10, //0b00010000,  // 1A.4
+  0x00, //0b00000000,  // 18.0
+  0x04, //0b00000100,  // 1A.2
+  0x00, //0b00000000,  // 18.6
+  0x00, //0b00000000,  // 16.4
+  0x00, //0b00000000,  // 18.5
+  0x00, //0b00000000,  // 18.3
 
-  0x00, //0b00000000,  // 17.6 
-  0x40, //0b01000000,  // 1A.6 
-  0x00, //0b00000000,  // 18.1 
-  0x00, //0b00000000,  // 18.4 
-  0x00, //0b00000000,  // 17.7 
-  0x00, //0b00000000,  // 16.6 
-  0x00, //0b00000000,  // 17.4 
-  0x00, //0b00000000,  // 17.2 
+  0x00, //0b00000000,  // 17.6
+  0x40, //0b01000000,  // 1A.6
+  0x00, //0b00000000,  // 18.1
+  0x00, //0b00000000,  // 18.4
+  0x00, //0b00000000,  // 17.7
+  0x00, //0b00000000,  // 16.6
+  0x00, //0b00000000,  // 17.4
+  0x00, //0b00000000,  // 17.2
 
-  0x00, //0b00000000,  // 16.0 
-  0x00, //0b00000000,  // 19.7 
-  0x00, //0b00000000,  // 16.3 
-  0x00, //0b00000000,  // 16.1 
-  0x00, //0b00000000,  // 18.2 
-  0x00  //0b00000000  // 19.4 
+  0x00, //0b00000000,  // 16.0
+  0x00, //0b00000000,  // 19.7
+  0x00, //0b00000000,  // 16.3
+  0x00, //0b00000000,  // 16.1
+  0x00, //0b00000000,  // 18.2
+  0x00  //0b00000000  // 19.4
 };
 
 /// <summary>
 /// 12-14 from 1C-1E (result from F)
 /// </summary>
 const uint32_t mUintArrBitPattern20[] /*PROGMEM*/ = {
-  0x000004, //0b000000000000000000000100, // 1C.2 
-  0x002000, //0b000000000010000000000000, // 1E.5 
-  0x008000, //0b000000001000000000000000, // 1E.7 
-  0x400000, //0b010000000000000000000000, // 1D.6 
-  0x000100, //0b000000000000000100000000, // 1E.0 
-  0x100000, //0b000100000000000000000000, // 1D.4 
-  0x000400, //0b000000000000010000000000, // 1E.2 
-  0x800000, //0b100000000000000000000000, // 1D.7 
+  0x000004, //0b000000000000000000000100, // 1C.2
+  0x002000, //0b000000000010000000000000, // 1E.5
+  0x008000, //0b000000001000000000000000, // 1E.7
+  0x400000, //0b010000000000000000000000, // 1D.6
+  0x000100, //0b000000000000000100000000, // 1E.0
+  0x100000, //0b000100000000000000000000, // 1D.4
+  0x000400, //0b000000000000010000000000, // 1E.2
+  0x800000, //0b100000000000000000000000, // 1D.7
 
-  0x040000, //0b000001000000000000000000, // 1D.2 
-  0x020000, //0b000000100000000000000000, // 1D.1 
-  0x000008, //0b000000000000000000001000, // 1C.3 
-  0x000200, //0b000000000000001000000000, // 1E.1 
-  0x004000, //0b000000000100000000000000, // 1E.6 
-  0x000002, //0b000000000000000000000010, // 1C.1 
-  0x001000, //0b000000000001000000000000, // 1E.4 
-  0x080000, //0b000010000000000000000000, // 1D.3 
+  0x040000, //0b000001000000000000000000, // 1D.2
+  0x020000, //0b000000100000000000000000, // 1D.1
+  0x000008, //0b000000000000000000001000, // 1C.3
+  0x000200, //0b000000000000001000000000, // 1E.1
+  0x004000, //0b000000000100000000000000, // 1E.6
+  0x000002, //0b000000000000000000000010, // 1C.1
+  0x001000, //0b000000000001000000000000, // 1E.4
+  0x080000, //0b000010000000000000000000, // 1D.3
 
-  0x000800, //0b000000000000100000000000, // 1E.3 
-  0x200000, //0b001000000000000000000000, // 1D.5 
-  0x010000, //0b000000010000000000000000, // 1D.0 
-  0x000001  //0b000000000000000000000001  // 1C.0 
+  0x000800, //0b000000000000100000000000, // 1E.3
+  0x200000, //0b001000000000000000000000, // 1D.5
+  0x010000, //0b000000010000000000000000, // 1D.0
+  0x000001  //0b000000000000000000000001  // 1C.0
 };
 
 /// <summary>
@@ -374,7 +467,7 @@ void CopyTimeToByteUint(byte* data, byte* key, struct DataContainer* container) 
   container->mByteUint3.FullUint = 0;
   container->mUintLowerTime = 0;
   container->mByteUpperTime2 = 0;
-  
+
   for (int i = 0; i < 4; i++) {
       container->mUintLowerTime <<= 8;
       container->mUintLowerTime |= key[3 - i];
@@ -507,36 +600,36 @@ void DoPbox(struct DataContainer* container) {
 
 void Decrypt(byte* cipher, byte* key, byte* result) {
   DataContainer container;
-  
+
   CopyTimeToByteUint(cipher, key, &container);
-  
+
   // OUTER LOOP 1
   for (int i = 16; i > 0; i--) {
     ShiftTimeRight(i, &container);
     ExpandR(&container);
     CompressKey(&container);
-    
+
     // expR XOR compr.Key
     container.mByteUint1.FullUint ^= container.mByteUint3.FullUint; // 12-15 XOR 0B-0E
     container.mByteUint3.Byte2 &= 0x0F;       // clear 0D(4-7)
-    
+
     DoSbox(&container);
     DoPbox(&container);
-    
+
     // L XOR P-Boxed Round-Key (L')
     container.mByteUint1.FullUint ^= container.mByteUint2.FullUint;
-    
+
     // L = R
     container.mByteUint2.FullUint = container.mByteUint3.FullUint & (uint32_t)0x00FFFFFF;
-    
+
     // R = L'
     container.mByteUint3.FullUint = container.mByteUint1.FullUint & (uint32_t)0x00FFFFFF;
   } // end of outer loop 1
-  
+
   container.mByteUint3.FullUint <<= 4;
   container.mByteUint2.Byte2 &= 0x0F;
   container.mByteUint2.Byte2 |= (byte)(container.mByteUint3.Byte0 & 0xF0);
-  
+
   //R0B0C0D0E.byte.R0D |= (R08090A.byte.R08 & 0xF0);
   result[0] = container.mByteUint2.Byte0;
   result[1] = container.mByteUint2.Byte1;
@@ -589,11 +682,11 @@ bool GetWeatherInfo(byte* aWeatherInfo) {
     aWeatherInfo[0] = (PlainBytes[3]&0x0F)<<4;
     aWeatherInfo[0] |= (PlainBytes[2]&0xF0)>>4;
     aWeatherInfo[0] = flipByte(aWeatherInfo[0]);
-               
+
     aWeatherInfo[1] = (PlainBytes[4]&0x0F)<<4;
     aWeatherInfo[1] |= (PlainBytes[3]&0xF0)>>4;
     aWeatherInfo[1] = flipByte(aWeatherInfo[1]);
-               
+
     aWeatherInfo[2] = (PlainBytes[0]&0x0F)<<4;
     aWeatherInfo[2] |= (PlainBytes[4]&0xF0)>>4;
     aWeatherInfo[2] = flipByte(aWeatherInfo[2]);
@@ -601,7 +694,7 @@ bool GetWeatherInfo(byte* aWeatherInfo) {
     aWeatherInfo[2] |= 0x02;
     lValid = true;
   }
-  
+
   return lValid;
 }
 
@@ -645,9 +738,14 @@ String decToBinStr( byte aInfo[3] ) {
 }
 
 
+static void updateIcons( SpriteSheetIcon icon1, SpriteSheetIcon icon2, SpriteSheetIcon icon3 );
+static bool weatherReady = false;
+
 // TODO: move this to UI.h
 void showWeather() {
+
   String out = "";
+  String citiesNames = "";
   char str[255];
   /*
     0110  Day critical weather
@@ -667,13 +765,17 @@ void showWeather() {
   int anm  = binStrToDec( meteodata.substring(15, 16) ); // Anomaly
   int tem  = binStrToDec( meteodata.substring(16, 22) ); // Temperature
 
-  log_d("dcw=%s, ncw=%s, xwh=%s, rpb=%s, anm=%s, tem=%d%sC", weather[dcw].c_str(), weather[ncw].c_str(), winddirection[xwh], probprecip[rpb], anm==0 ? "yes" : "no", tem-22, String( degreeSign ).c_str() );
+  SpriteSheetIcon icon1 = weather[dcw].icon;
+  SpriteSheetIcon icon2 = atomic;
+  SpriteSheetIcon icon3 = weather[ncw].icon;
+
+  log_d("dcw=%s, ncw=%s, xwh=%s, rpb=%s, anm=%s, tem=%d%sC", weather[dcw].label, weather[ncw].label, winddirection[xwh].label, rainprobability[rpb].label, anm==0 ? "yes" : "no", tem-22, String( degreeSign ).c_str() );
 
   //DCFDateTime mDcfTime = mDcf.GetTime();
   // uint8_t yOff, m, d, hh, mm;
 
-  fourdayforecast = ((dcfHour) % 3) * 20; 
-  
+  fourdayforecast = ((dcfHour) % 3) * 20;
+
   if (dcfMinute > 0) {
     fourdayforecast += (dcfMinute - 1) / 3;
   }
@@ -687,102 +789,102 @@ void showWeather() {
   log_d("four: %d, two: %d", fourdayforecast, twodayforecast);
   Serial.print("");
   delay(10);
-  
+
   if (dcfHour < 21) { //Between 21:00-23:59 significant weather & temperature is for cities 60-89 wind and wind direction for cities 0-59.
     if ((dcfHour) % 6 < 3) {
       weathermemory[fourdayforecast] = meteodata;  // Extreme weather is valid from this hour but also +3 hour
       significantweather[fourdayforecast] = weatherunbinary(8, 12);
     }
-    
-    sprintf( str, "Area 4dayforecast =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name);
+
+    sprintf( str, "Area 4day f/c =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name);
     Serial.println( str );
     out += String(str);
-    sprintf( str, "Area 4dayforecast =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "fourday f/c %5s =      %d ", String( (((dcfHour) % 6) > 2) ? "Night" : "Day" ).c_str(), int( (dcfHour / 6) + 1 ) );
+    sprintf( str, "4day f/c %5s =      %d ", String( (((dcfHour) % 6) > 2) ? "Night" : "Day" ).c_str(), int( (dcfHour / 6) + 1 ) );
     Serial.println( str );
     out += String(str);
     sprintf( str, "Day               =   %s %02x ", meteodata.substring(0, 4).c_str(), dcw);
     Serial.print( str );
     out += String(str);
 
+    sprintf( str, "%s ", weather[dcw].label);
     if (dcw == 5 || dcw == 6 || dcw == 13 || dcw == 7) {
       if (significantweather[fourdayforecast] == 1 || significantweather[fourdayforecast] == 2) {
-        sprintf( str, "%s%s with thunderstorms ", (dcw != 6) ? "Heavy " : "", weather[dcw].c_str());
-      } else {
-        sprintf( str, "%s ", weather[dcw].c_str());
+        sprintf( str, "%s%s with thunderstorms ", (dcw != 6) ? "Heavy " : "", weather[dcw].label);
       }
-    } else {
-      sprintf( str, "%s ", weather[dcw].c_str());
     }
     Serial.println( str );
     out += String(str);
 
-    
     sprintf( str, "Night             =   %s %02x ", meteodata.substring(4, 8).c_str(), ncw);
     if (ncw == 5 || ncw == 6 || ncw == 13 || ncw == 7) {
       if (significantweather[fourdayforecast] == 1 || significantweather[fourdayforecast] == 3) {
-        sprintf( str, "%s%s with thunderstorms ", (ncw != 6) ? "Heavy " : "", weather[ncw].c_str());
+        sprintf( str, "%s%s with thunderstorms ", (ncw != 6) ? "Heavy " : "", weather[ncw].label);
       } else {
-        sprintf( str, "%s ", weather[ncw].c_str());
+        sprintf( str, "%s ", weather[ncw].label);
       }
     } else {
       if (ncw == 1) {
         sprintf( str, "Clear");
       } else {
-        sprintf( str, "%s ", weather[ncw].c_str());
+        sprintf( str, "%s ", weather[ncw].label);
       }
     }
     Serial.println( str );
     out += String(str);
-    
+
     if ((dcfHour) % 6 < 3) {
-      sprintf( str, "Extremeweather    =   "); 
+      sprintf( str, "Extremeweather    =   ");
       Serial.print( str );
       out += String(str);
       if (xwh == 0) { // DI=0 and WA =0
-        sprintf( str, "%s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]]);
+        sprintf( str, "%s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].label);
         Serial.println( str );
         out += String(str);
       } else {
-        sprintf( str, "%s %02x %s ", meteodata.substring(8, 10).c_str(), anm1, anomaly1[anm1].c_str() );
+        sprintf( str, "%s %02x %s ", meteodata.substring(8, 10).c_str(), anm1, anomaly1[anm1].label );
         Serial.println( str );
         out += String(str);
-        sprintf( str, "%s %02x %s ", meteodata.substring(10, 12).c_str(), anm2, anomaly2[anm2].c_str() );
+        sprintf( str, "%s %02x %s ", meteodata.substring(10, 12).c_str(), anm2, anomaly2[anm2].label );
         Serial.println( str );
         out += String(str);
       }
-      sprintf( str, "Rainprobability   =    %s %02x %s ", meteodata.substring(12, 15).c_str(), rpb, probprecip[rpb].c_str() );
+      sprintf( str, "Rainprobability   =    %s %02x %s ", meteodata.substring(12, 15).c_str(), rpb, rainprobability[rpb].label );
       Serial.println( str );
       out += String(str);
     }
     if ((dcfHour) % 6 > 2) {
-      sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].c_str());
+      icon2 = winddirection[xwh].icon;
+      sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label);
       Serial.println( str );
       out += String(str);
-      sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].c_str());
+      sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label);
       Serial.println( str );
       out += String(str);
-      sprintf( str, "Extremeweather    =   %s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].c_str());
+      sprintf( str, "Extremeweather    =   %s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].label);
       Serial.println( str );
       out += String(str);
     }
     sprintf( str, "Weather Anomality =      %s %02x %s ", meteodata.substring(15, 16).c_str(), anm, (anm == 1) ? "Yes" : "No");
     Serial.println( str );
     out += String(str);
+
+    sprintf( str, " 4 day: %s ", cities[fourdayforecast].name );
+    citiesNames += str;
+
+
   } else {
     //Serial.printf("Area 4dayforecast =   %d %s\n", fourdayforecast, town[fourdayforecast].c_str());
     sprintf( str, "Area 4dayforecast =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name);
     Serial.println( str );
     out += String(str);
-    sprintf( str, "fourday f/c %05s =      %d ", (((dcfHour) % 6) > 2) ? "Night" : "Day", (dcfHour / 6) + 1);
+    sprintf( str, "fourday f/c %5s =      %d ", (((dcfHour) % 6) > 2) ? "Night" : "Day", (dcfHour / 6) + 1);
     Serial.println( str );
     out += String(str);
-    sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].c_str());
+    icon2 = winddirection[xwh].icon;
+    sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label);
     Serial.println( str );
     out += String(str);
-    sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].c_str());
+    sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label);
     Serial.println( str );
     out += String(str);
     sprintf( str, "Area 2dayforecast =   %d %s (%s) ", twodayforecast, cities[twodayforecast].name, cities[twodayforecast].country.name);
@@ -791,19 +893,22 @@ void showWeather() {
     sprintf( str, "twoday f/c day    =      %d ", (((dcfHour - 21) * 60 + dcfMinute) > 90) ? 2 : 1);
     Serial.println( str );
     out += String(str);
-    sprintf( str, "Day               =   %s %02x %s ", meteodata.substring(0, 4).c_str(), dcw, weather[dcw].c_str());
+    sprintf( str, "Day               =   %s %02x %s ", meteodata.substring(0, 4).c_str(), dcw, weather[dcw].label);
     Serial.println( str );
     out += String(str);
-    sprintf( str, "Night             =   %s %02x %s ", meteodata.substring(4, 8).c_str(), ncw, (ncw == 1) ? "Clear" : weather[ncw].c_str());
+    sprintf( str, "Night             =   %s %02x %s ", meteodata.substring(4, 8).c_str(), ncw, (ncw == 1) ? "Clear" : weather[ncw].label);
     Serial.println( str );
     out += String(str);
     sprintf( str, "Weather Anomality =      %s %02x %s ", meteodata.substring(15, 16).c_str(), anm, (anm == 1) ? "Yes" : "No");
     Serial.println( str );
     out += String(str);
+
+    sprintf( str, " 2 day: %s ", cities[twodayforecast].name );
+    citiesNames += str;
   }
 
   String temperatureStr;
-  
+
   if (tem == 0) {
     temperatureStr = "<-21 " + String(degreeSign) + "C";
   } else if (tem == 63) {
@@ -821,10 +926,12 @@ void showWeather() {
   sprintf( str, "Temperature       = %s %02x %s ", meteodata.substring(16, 22).c_str(), tem, temperatureStr.c_str());
   Serial.println( str );
   out += String(str);
-  sprintf( str, "Decoder status    =     %s    %s ", meteodata.substring(22, 24), meteodata.substring(22, 24) == "10" ? "OK" : "NOT OK");
-  Serial.println( str );
-  out += String(str);
+  //sprintf( str, "Decoder status    =     %s    %s ", meteodata.substring(22, 24).c_str(), meteodata.substring(22, 24) == "10" ? "OK" : "NOT OK");
+  //Serial.println( str );
+  //out += String(str);
   #ifdef DCF77_DO_WEATHER
-    updateScroll( out );
+    //updateScroll( out );
+    updateScroll( citiesNames );
+    updateIcons( icon1, icon2, icon3 );
   #endif
 }

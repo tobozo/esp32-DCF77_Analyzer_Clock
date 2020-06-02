@@ -18,7 +18,7 @@ void IRAM_ATTR int0handler() {
 
 
 static void mainTask( void * param ) {
-  log_d( "Entering loop task" );
+  log_e( "Starting main DCF77 signal task" );
   // Initialize DCF77 pulse interrupt on pin interrupt(DCF77PIN), looking for a change of the signal,
   // so either rising or falling edge pulses will trigger the interrupt handler and
   // execute the int0handler function.
@@ -29,15 +29,15 @@ static void mainTask( void * param ) {
       previousSignalState = DCFSignalState; // 'reset' state of variable
       scanSignal(); // evaluate incoming pulse
     }
-    vTaskDelay( 10 );
+    vTaskDelay( 1 );
   }
 }
 
 
 #ifdef SPEAKER_PIN
   static void soundTask( void * param ) {
-    log_d( "Entering sound task" );
-    while( true ) { 
+    log_e( "Starting sound task" );
+    while( true ) {
       if(willBuzzNote!=0 && willBuzzDuration!=0) {
         Speaker.tone( willBuzzNote, willBuzzDuration );
         vTaskDelay( 1 );
@@ -53,9 +53,17 @@ static void mainTask( void * param ) {
 
 #ifdef USE_BUTTONS
   static void buttonsTask( void * param ) {
-    log_e("Entering buttons task");
+    //UIModes currentMode = UIMode;
+    log_e("Starting buttons task");
     while( true ) {
       checkButtons();
+      /*
+      if( currentMode != UIMode ) {
+        takeMuxSemaphore();
+        tft.fillScreen( TFT_BLACKISH );
+        giveMuxSemaphore();
+        currentMode = UIMode;
+      }*/
     }
   }
 #endif
@@ -74,7 +82,9 @@ static void doSecondlyTask() {
         // do something at midnight
         log_d( "midnight" );
       }
-      displayRtcDate();
+      if( UIMode == DCF_CLOCK ) {
+        displayRtcDate();
+      }
       break;
     case 2:
       // hourly chime output: DEACTIVATE
@@ -103,23 +113,25 @@ static void doSecondlyTask() {
   }// switch
 }
 
-
+/*
 static void tasksEverySecond() {
   if ( second() != previousSecond ) {
     // 'reset' variable state
     previousSecond = second();
     doSecondlyTask();
   }
-}
+}*/
 
 
 static void doMinutelyTask() {
   // display date, week LED's, week nr etc.
   if ( dcfValidSignal == true ) {
-    displayData();
+    if( UIMode == DCF_CLOCK ) {
+      displayData();
+    }
   }
 }
-
+/*
 void tasksEveryMinute() {
   // display date, week LED's, week nr etc. if time is changed
   if ( minute() != previousMinute ) {
@@ -127,13 +139,15 @@ void tasksEveryMinute() {
     previousMinute = minute();
     doMinutelyTask();
   }
-}
+}*/
 
 
 static void doHourlyTask() {
   errorCounter = 0;
   // update error counter display
-  LedDisplay( DisplayBufferBitError, "R", errorCounter );
+  //if( UIMode == DCF_CLOCK ) {
+    LedDisplay( DisplayBufferBitError, "R", errorCounter );
+  //}
 }
 
 void tasksEveryHour() {
@@ -171,50 +185,121 @@ void finalizeBufferTask( void *param ) {
 
 
 static void timerTasks( void *param ) {
-  log_d( "Entering timers task" );
+  log_w( "Entering timers task" );
   #ifdef DCF77_DO_WEATHER
     initScroll();
   #endif
+  byte lastPushCounter = 0;
   while(1) {
     if ( second() != previousSecond ) {
       previousSecond = second();
-      xTaskCreatePinnedToCore( secondlyTask, "secondlyTask", 2048, NULL, 7, NULL, 0 );
+      xTaskCreatePinnedToCore( secondlyTask, "secondlyTask", 2048, NULL, 1, NULL, 0 );
       vTaskDelay( 20 );
       continue;
     }
     if ( minute() != previousMinute ) {
       previousMinute = minute();
-      xTaskCreatePinnedToCore( minutelyTask, "minuteTask", 2048, NULL, 6, NULL, 0 );
+      xTaskCreatePinnedToCore( minutelyTask, "minuteTask", 2048, NULL, 1, NULL, 0 );
       vTaskDelay( 20 );
       continue;
     }
     if (hour() != previousHour) {
       previousHour = hour();
-      xTaskCreatePinnedToCore( hourlyTask, "hourlyTask", 2048, NULL, 5, NULL, 0 );
+      xTaskCreatePinnedToCore( hourlyTask, "hourlyTask", 2048, NULL, 1, NULL, 0 );
       vTaskDelay( 20 );
       continue;
     }
-    // retrieve last buffer changes
-    takeMuxSemaphore();
-    MainSprite.pushImage( 0, 0, M5.Lcd.width(), M5.Lcd.height(), (const uint16_t*)sprite.frameBuffer(1) );
-    giveMuxSemaphore();
+    if( UIMode == COOK_TIMER ) {
+      cookTimerloop();
+    } else {
+      #ifdef DCF77_DO_WEATHER
+      if( weatherReady ) {
+        showWeather();
+        weatherReady = false;
+      }
+      #endif
+    }
+    if( lastPushCounter != longPushCounter ) {
+      lastPushCounter = longPushCounter;
 
+      takeMuxSemaphore();
+      if( longPushCounter == 0 ) {
+        sprite.fillRect( sprite.width()-15, 30, 10, 31, TFT_BLACK );
+      } else {
+        sprite.fillRect( sprite.width()-15, 60-longPushCounter, 10, longPushCounter, TFT_BLUE );
+      }
+      giveMuxSemaphore();
+
+    }
+    // retrieve last buffer changes
+
+/*
+    takeMuxSemaphore();
+    MainSprite.createSprite( tft.width(), tft.height() );
+    MainSprite.fillSprite( TFT_BLACK );
+    MainSprite.setSwapBytes( true );
+    MainSprite.pushImage( 0, 0, tft.width(), tft.height(), (const uint16_t*)sprite.frameBuffer(1) );
+    giveMuxSemaphore();
+*/
     #ifdef DCF77_DO_WEATHER
-      handleScroll();
+      //handleScroll();
     #endif
-    
+
+    takeMuxSemaphore();
+    sprite.pushSprite(0, 0, TFT_BLACK );
+    giveMuxSemaphore();
+/*
     takeMuxSemaphore();
     MainSprite.pushSprite( 0, 0, TFT_BLACK ); // last = transparent color
-    giveMuxSemaphore();
+    MainSprite.deleteSprite();
+    giveMuxSemaphore();*/
     vTaskDelay( 20 );
   }
+}
+
+static uint8_t needrendering;// = 0;
+static bool isrendering = false;
+
+static void drawIcon( SpriteSheetIcon icon, uint16_t x, uint16_t y ) {
+  while( isrendering ) {
+    vTaskDelay( 10 );
+  }
+  isrendering = true;
+  log_w("Icon #%d will be rendererd at [%d,%d] (%d in queue)", icon, x, y, needrendering );
+  takeMuxSemaphore();
+  tft.fillRect( x, y, 32, 32, TFT_BLACK );
+  //bool swap = sprite.getSwapBytes();
+  //sprite.setSwapBytes( !swap ); // dafuq
+  sprite_drawSpriteSheet( sprite, icon, x, y );
+  giveMuxSemaphore();
+  needrendering--;
+  isrendering = false;
+  log_w("Icon #%d was rendererd !", icon );
+}
+
+
+static void drawIcon( void * param ) {
+  if( param == nullptr ) {
+    vTaskDelete( NULL );
+    return;
+  }
+  //*param = reinterpret_cast<UI_Icon*>(param);
+  UI_Icon *taskicon = reinterpret_cast<UI_Icon*>(param);
+  //UI_Icon *taskicon = (UI_Icon*) param;
+  drawIcon( taskicon->spriteSheetIcon, taskicon->x, taskicon->y );
+  vTaskDelete( NULL );
+}
+
+static void drawIconTask( SpriteSheetIcon icon, uint16_t x, uint16_t y ) {
+  UI_Icon *taskicon = new UI_Icon(x, y, icon);
+  xTaskCreatePinnedToCore( drawIcon, "drawIcon", 16000, (void*)taskicon, 8, NULL, 0 );
 }
 
 
 static void setupTasks( void* params=NULL ) {
   mux = xSemaphoreCreateMutex();
   #ifdef USE_BUTTONS
-    xTaskCreatePinnedToCore( buttonsTask, "buttonsTask", 2048, NULL, 1, NULL, 0 );
+    xTaskCreatePinnedToCore( buttonsTask, "buttonsTask", 4096, NULL, 1, NULL, 0 );
     vTaskDelay( 10 );
   #endif
   #ifdef SPEAKER_PIN

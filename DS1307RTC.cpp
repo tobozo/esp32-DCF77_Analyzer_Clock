@@ -1,6 +1,6 @@
 /*
  * DS1307RTC.h - library for DS1307 RTC
-  
+
   Copyright (c) Michael Margolis 2009
   This library is intended to be uses with Arduino Time.h library functions
 
@@ -17,7 +17,7 @@
   You should have received a copy of the GNU Lesser General Public
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  
+
   30 Dec 2009 - Initial release
   5 Sep 2011 updated for Arduino 1.0
   15 Aug 2018 removed constructor and implemented begin()
@@ -26,14 +26,14 @@
 #include <Wire.h>
 #include "DS1307RTC.h"
 
-DS1307RTC::DS1307RTC()
-{
+DS1307RTC::DS1307RTC() {
   // Wire.begin();
 }
 
 void DS1307RTC::begin( uint8_t sdaPin, uint8_t sclPin ) {
   if( sdaPin==0 || sclPin==0) {
     Wire.begin();
+    log_d( "RTC begin SDA:%d, SCL:%d", sdaPin, sclPin );
   } else {
     Wire.begin( sdaPin, sclPin );
     log_d( "RTC begin SDA:%d, SCL:%d", sdaPin, sclPin );
@@ -43,13 +43,13 @@ void DS1307RTC::begin( uint8_t sdaPin, uint8_t sclPin ) {
 
 uint8_t DS1307RTC::isrunning( void ) {
   Wire.beginTransmission( DS1307_CTRL_ID );
-  Wire.write( (int)0 );  
+  Wire.write( (int)0 );
   Wire.endTransmission();
   Wire.requestFrom( DS1307_CTRL_ID, 1 );
   uint8_t ss = Wire.read();
   return !( ss>>7 );
 }
-  
+
 // PUBLIC FUNCTIONS
 time_t DS1307RTC::get()   // Aquire data from buffer and convert to time_t
 {
@@ -61,13 +61,13 @@ time_t DS1307RTC::get()   // Aquire data from buffer and convert to time_t
   return( makeTime(tm) );
 }
 
-bool DS1307RTC::set( time_t t ) {
+void DS1307RTC::set( time_t t ) {
   tmElements_t tm;
   breakTime( t, tm );
-  tm.Second |= 0x80;  // stop the clock 
-  write( tm ); 
+  tm.Second |= 0x80;  // stop the clock
+  write( tm );
   tm.Second &= 0x7f;  // start the clock
-  write( tm ); 
+  write( tm );
 }
 
 
@@ -75,7 +75,7 @@ bool DS1307RTC::set( time_t t ) {
 bool DS1307RTC::read( tmElements_t &tm ) {
   uint8_t sec;
   Wire.beginTransmission( DS1307_CTRL_ID );
-  Wire.write( (int)0 );  
+  Wire.write( (int)0 );
   if ( Wire.endTransmission() != 0 ) {
     log_e( "unexpected end of transmission" );
     exists = false;

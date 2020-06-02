@@ -75,7 +75,7 @@ static uint16_t willBuzzNote;
 static int willBuzzDuration;
 
 // Pulse flanks
-static unsigned long flankTime    = 0;
+//static unsigned long flankTime    = 0;
 static unsigned long leadingEdge  = 0;
 static unsigned long trailingEdge = 0;
 unsigned long previousLeadingEdge = 0;
@@ -88,7 +88,7 @@ static int previousSecond      = 0;
 static int previousSignalState = 0;
 
 // DCF Buffers and indicators
-static int DCFbitBuffer[59]; // here, the received DCFbits are stored 
+static int DCFbitBuffer[59]; // here, the received DCFbits are stored
 static int DCFbitFinalBuffer[59]; // here, the received DCFbits are stored
 const int bitValue[] = {1, 2, 4, 8, 10, 20, 40, 80}; // these are the decimal values of the received DCFbits
 
@@ -147,7 +147,7 @@ extern void error( int errorLed );
 extern void scheduleBuzz( uint16_t note, int duration );
 extern void LedErrorStatus( byte lednum, int status );
 extern void displayBufferPosition( int dcfBit );
-extern void setRingLed( byte ringNum, byte ledNum, bool enable, uint16_t color = ST7735_GRAY );
+extern void setRingLed( byte ringNum, byte ledNum, bool enable, uint16_t color = TFT_GRAY );
 extern void LedParityStatus( byte paritynum, int status );
 extern void LedDCFStatus( int status );
 extern void clearRing( byte ringNum );
@@ -470,7 +470,7 @@ void finalizeBuffer( void ) {
     return;
   }
   finalizing = true;
-  unsigned long start = millis();
+  __attribute__((unused)) unsigned long start = millis();
   //--------------------------------------------------------------------
   // We are here because of the detected 2 second 'gap'.
   // Now check if it correspondends with the buffer counter
@@ -510,7 +510,7 @@ void finalizeBuffer( void ) {
     // The buffer is not yet filled although the 2 second 'gap' was detected.
     // Can be result of a noisy signal, starting in middle of receiving data etc.
     // Turn 'Minute Mark' LED ON
-    //--------------------------------------------------------------------    
+    //--------------------------------------------------------------------
     LedErrorStatus( LED_MINUTEMARKER, HIGH );
     log_w( "Minute Mark" );
     // Clear displays
@@ -521,8 +521,8 @@ void finalizeBuffer( void ) {
     // set flag so we can display incoming pulsed on the inner LED ring.
     MinuteMarkerFlag = true;
   }
-  unsigned long duration = millis() - start;
-  log_i( " FinalizeBuffer() duration %d ms", duration );
+  //unsigned long duration = millis() - start;
+  log_i( " FinalizeBuffer() duration %d ms", (int)(millis() - start) );
   finalizing = false;
 }
 
@@ -573,7 +573,8 @@ void decodeBufferContents( void ) {
       if (GetWeatherInfo( aInfo ) ) { // Decrypt
         //log_d( "Ciphered Weather Data: %s", mDcf.weatherData );
         meteodata = decToBinStr( aInfo );
-        showWeather();
+        //showWeather();
+        weatherReady = true;
       }
     }
   #endif

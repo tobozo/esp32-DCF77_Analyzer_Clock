@@ -10,9 +10,9 @@
 #define DCF77_DO_WEATHER  // handle weather data (comment this out to get rid of the text scroll)
 
 // RTC module (DS1307) support, optional but strongly recommended
-#define DS1307_SDA        33
-#define DS1307_SCL        27
-#define DS1307_CTRL_ID 0x68 
+#define DS1307_SDA     33
+#define DS1307_SCL     27
+#define DS1307_CTRL_ID 0x68
 
 #define USE_RTC
 #define USE_BUTTONS

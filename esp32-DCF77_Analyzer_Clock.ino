@@ -42,8 +42,8 @@
     - Bodmer's JPEGDecoder for rendering jpeg in sprites https://github.com/Bodmer/JPEGDecoder
 
   CREDITS:
-    I learned a lot from Erik de Ruiter who learned a lot from the work of Matthias Dalheimer and Thijs Elenbaas 
-    who made their own DCF77 decoders. 
+    I learned a lot from Erik de Ruiter who learned a lot from the work of Matthias Dalheimer and Thijs Elenbaas
+    who made their own DCF77 decoders.
     Although the changes I made are far from optimistic, this code has wisedom DNA in its roots!
     Without the incredible work of these geniuses I would not have known where to start and how to write those credits :)
     I ended up writing my own code (using bits and pieces of their ideas) so I could understand what is happening...
@@ -57,7 +57,7 @@
   Interesting websites:
     - Inspirational video     : https://www.youtube.com/watch?v=ZadSU_DT-Ks
     - UI code based on        : https://github.com/deruiter/DCF77-Analyzer-Clock-V2.0
-    - Crypto code based on    : https://github.com/FroggySoft/AlarmClock 
+    - Crypto code based on    : https://github.com/FroggySoft/AlarmClock
     - Weather code based on   : http://arduino-projects4u.com/home-weather-station/
     - Erik de Ruiter          : https://www.hackster.io/edr1924
     - Brett Oliver            : http://www.brettoliver.org.uk/
@@ -75,7 +75,6 @@
 
 
 #include "Config.h"
-#include <M5Stack.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
 #include "UI.h" // TFT Support for Clock Analyzer + JPEG/Adafruit layer
 
 void loop() {
