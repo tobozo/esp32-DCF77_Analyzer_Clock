@@ -25,6 +25,14 @@ static xSemaphoreHandle mux = NULL; // this is needed to prevent rendering colli
 #define takeMuxSemaphore() if( mux ) { xSemaphoreTake( mux, portMAX_DELAY ); log_v( "Took Semaphore" ); }
 #define giveMuxSemaphore() if( mux ) { xSemaphoreGive( mux ); log_v( "Gave Semaphore" ); }
 
+
+struct boxStyle {
+  std::uint32_t textColor;
+  std::uint32_t fillColor;
+  boxStyle( std::uint32_t  t, std::uint32_t  f ) : textColor(t), fillColor(f) { }
+};
+
+
 // this is just lgfx::TextStyle with a constructor
 struct TextStyle {
   std::uint32_t fore_rgb888 = 0xFFFFFFU;
@@ -76,6 +84,10 @@ void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle ) {
 #endif
 
 #include "DCF77.h"
+
+
+boxStyle *BoxSelected = new boxStyle( TFT_LIGHTGRAY, TFT_WHITE );
+boxStyle *BoxUnSelected = new boxStyle( TFT_DARKGRAY, TFT_LIGHTGRAY );
 
 static TFT_eSprite sprite = TFT_eSprite( &tft );
 
@@ -554,47 +566,44 @@ void LedErrorStatus( byte lednum, int status ) {
 
 
 void LedWeekStatus( int weekDay, int status ) {
-  int xpos = tft.width() - ( weekDayNamesWidth + 2 ) + 1;
-  int ypos = WeekDayLedYpos;//( tft.height() - (LedWeekStatusFontHeight * 2) ) - 1;
+  int xpos = tft.width() - ( weekDayNamesWidth + 1 );
+  int ypos = ( tft.height() - (LedWeekStatusFontHeight) ) - 3;
+  int weekDayBlockWidth = LedWeekStatusFontWidth + 2;
   int vpos = 0;
-  //int fontwidth = 6;
-  //byte fontAscent = 5;
+
   switch ( weekDay ) {
     case 22: // LED_SUNDAY    // output - LED - Sunday
       xpos += 0;
     break;
     case 23: // LED_MONDAY    // output - LED - Monday
       vpos = 1;
-      xpos += LedWeekStatusFontWidth;
+      xpos += weekDayBlockWidth;
     break;
     case 24: // LED_TUESDAY   // output - LED - Tuesday
       vpos = 2;
-      xpos += LedWeekStatusFontWidth * 2;
+      xpos += weekDayBlockWidth * 2;
     break;
     case 25: // LED_WEDNESDAY // output - LED - Wednesday
       vpos = 3;
-      xpos += LedWeekStatusFontWidth * 3;
+      xpos += weekDayBlockWidth * 3;
     break;
     case 26: // LED_THURSDAY  // output - LED - Thursday
       vpos = 4;
-      xpos += LedWeekStatusFontWidth * 4;
+      xpos += weekDayBlockWidth * 4;
     break;
     case 27: // LED_FRIDAY    // output - LED - Friday
       vpos = 5;
-      xpos += LedWeekStatusFontWidth * 5;
+      xpos += weekDayBlockWidth * 5;
     break;
     case 28: // LED_SATURDAY  // output - LED - Saturday
       vpos = 6;
-      xpos += LedWeekStatusFontWidth * 6;
+      xpos += weekDayBlockWidth * 6;
     break;
     case 29: // LED_CEST      // output - LED - Summertime CEST
       takeMuxSemaphore();
       setFontStyle( &sprite, LedWeekStatusFontStyle );
-      sprite.fillRect( CETXPos, CETCESTYPos - LedWeekStatusFontHeight - 1, CETWidth + 2, LedWeekStatusFontHeight+1, TFT_WHITE );
-      sprite.setTextColor( TFT_LIGHTGRAY );
-      sprite.drawString( "CET", CETXPos + 1, (CETCESTYPos - LedWeekStatusFontHeight) );
-      sprite.fillRect( CESTXpos, CETCESTYPos - LedWeekStatusFontHeight - 1, CESTWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_LIGHTGRAY : TFT_WHITE );
-      sprite.setTextColor( status ? TFT_DARKGRAY : TFT_LIGHTGRAY );
+      sprite.fillRect( CESTXpos, CETCESTYPos - LedWeekStatusFontHeight - 1, CESTWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_WHITE : TFT_LIGHTGRAY);
+      sprite.setTextColor( status ? TFT_LIGHTGRAY : TFT_DARKGRAY );
       sprite.drawString( "CEST", CESTXpos + 1, (CETCESTYPos - LedWeekStatusFontHeight) );
       giveMuxSemaphore();
       return;
@@ -602,20 +611,17 @@ void LedWeekStatus( int weekDay, int status ) {
     case 30: // LED_CET       // output - LED - Wintertime CET
       takeMuxSemaphore();
       setFontStyle( &sprite, LedWeekStatusFontStyle );
-      sprite.fillRect( CETXPos, CETCESTYPos - LedWeekStatusFontHeight - 1, CETWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_LIGHTGRAY : TFT_WHITE );
-      sprite.setTextColor( status ? TFT_DARKGRAY : TFT_LIGHTGRAY );
+      sprite.fillRect( CETXPos, CETCESTYPos - LedWeekStatusFontHeight - 1, CETWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_WHITE : TFT_LIGHTGRAY );
+      sprite.setTextColor( status ? TFT_LIGHTGRAY : TFT_DARKGRAY );
       sprite.drawString( "CET", CETXPos + 1, (CETCESTYPos - LedWeekStatusFontHeight) );
-      sprite.fillRect( CESTXpos, CETCESTYPos - LedWeekStatusFontHeight - 1, CESTWidth + 2, LedWeekStatusFontHeight+1, TFT_WHITE );
-      sprite.setTextColor( TFT_LIGHTGRAY );
-      sprite.drawString( "CEST", CESTXpos + 1, (CETCESTYPos - LedWeekStatusFontHeight) );
       giveMuxSemaphore();
       return;
     break;
     case 31: // LED_LEAPYEAR  // output - LED - Leap year
       takeMuxSemaphore();
       setFontStyle( &sprite, LedWeekStatusFontStyle );
-      sprite.fillRect( LEAPXPos, LeapYearYpos - LedWeekStatusFontHeight - 1, LEAPWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_LIGHTGRAY : TFT_WHITE );
-      sprite.setTextColor( status ? TFT_DARKGRAY : TFT_LIGHTGRAY );
+      sprite.fillRect( LEAPXPos, LeapYearYpos - LedWeekStatusFontHeight - 1, LEAPWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_WHITE : TFT_LIGHTGRAY );
+      sprite.setTextColor( status ? TFT_LIGHTGRAY : TFT_DARKGRAY );
       sprite.drawString( "LEAP", LEAPXPos + 1, (LeapYearYpos - LedWeekStatusFontHeight) );
       giveMuxSemaphore();
       return;
@@ -626,8 +632,8 @@ void LedWeekStatus( int weekDay, int status ) {
       takeMuxSemaphore();
       setFontStyle( &sprite, LedWeekStatusFontStyle );
       tmpFontWidth = sprite.textWidth( weekNumStr );
-      sprite.fillRect( tft.width() - (tmpFontWidth + 2), WeekNumberYpos - 1, tmpFontWidth + 2, LedWeekStatusFontHeight+1, TFT_LIGHTGRAY );
-      sprite.setTextColor( weekNumber > 0 ? TFT_DARKGRAY : TFT_GRAY );
+      sprite.fillRect( tft.width() - (tmpFontWidth + 2), WeekNumberYpos - 1, tmpFontWidth + 2, LedWeekStatusFontHeight+1, weekNumber > 0 ? TFT_WHITE : TFT_LIGHTGRAY );
+      sprite.setTextColor( weekNumber > 0 ? TFT_LIGHTGRAY : TFT_DARKGRAY );
       sprite.drawString( String( weekNumStr ), tft.width() - (tmpFontWidth + 1), WeekNumberYpos );
       giveMuxSemaphore();
       return;
@@ -987,9 +993,9 @@ static void InitUI() {
   getTextBounds( &sprite, "LEAP", &LEAPWidth, &h );
   getTextBounds( &sprite, "CET", &CETWidth, &h );
   getTextBounds( &sprite, "CEST", &CESTWidth, &h );
-  CESTXpos = tft.width() - ( CESTWidth + 3 );
+  CESTXpos = tft.width() - ( CESTWidth + 2 );
   CETXPos  = tft.width() - ( CETWidth + 2 + 2 + CESTWidth + 2 );
-  LEAPXPos = tft.width() - ( LEAPWidth + 3 );
+  LEAPXPos = tft.width() - ( LEAPWidth + 2 );
 
   setFontStyle( &sprite, LedParityStatusFontStyle );
   getTextBounds( &sprite, "01100101 P", &tmpFontWidth, &tmpFontHeight );
@@ -1013,6 +1019,7 @@ static void InitUI() {
 
   LedWeekStatus( LED_CEST, LOW );
   LedWeekStatus( LED_CET, LOW );
+  LedWeekStatus( LED_LEAPYEAR, LOW );
 
   sprite.pushSprite( 0, 0, TFT_BLACK );
 }
@@ -1048,9 +1055,9 @@ void displayData( void ) {
   }
   // display Leap Year LED
   if ( leapYear == 1 ) {
-    LedWeekStatus( LED_LEAPYEAR, HIGH );
-  } else {
     LedWeekStatus( LED_LEAPYEAR, LOW );
+  } else {
+    LedWeekStatus( LED_LEAPYEAR, HIGH );
   }
   LedWeekStatus( LED_WEEKNUMBER, weekNumber );
   Serial.printf( "dcfWeekDay: %d, weekNumber: %d, dcfDay: %d, dcfMonth: %d, dcfYear: %d, dcfDST: %d, leapYear: %d\n", dcfWeekDay, weekNumber, dcfDay, dcfMonth, dcfYear, dcfDST, leapYear );
