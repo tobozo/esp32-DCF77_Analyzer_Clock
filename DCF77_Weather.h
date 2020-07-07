@@ -30,6 +30,13 @@ typedef struct {
   const char* name;
 } countryBycode;
 
+bool operator==(const countryBycode& lhs, const countryBycode& rhs) {
+  return strcmp(lhs.code, rhs.code)==0 && strcmp(lhs.name, rhs.name)==0;/* your comparison code goes here */
+}
+bool operator==(const countryBycode& lhs, countryBycode* rhs) {
+  return strcmp(lhs.code, rhs->code)==0 && strcmp(lhs.name, rhs->name)==0;/* your comparison code goes here */
+}
+
 typedef struct {
   countryBycode country;
   const char* name;
@@ -62,6 +69,10 @@ countryBycode Ireland      = {"IRL", "Ireland"};
 countryBycode Poland       = {"PL",  "Poland"};
 countryBycode Croatia      = {"HR",  "Croatia"};
 
+static countryBycode *watchedCountry = nullptr;
+static char *watchedCity = nullptr;
+
+// order matters !
 const cityByCountry cities[] = {
   {France, "Bordeaux"}, {France, "La Rochelle"}, {France, "Paris"}, {France, "Brest"}, {France, "Clermont-Ferrand"}, {France, "Beziers"}, {Belgium, "Bruxelles"}, {France, "Dijon"}, {France, "Marseille"}, {France, "Lyon"}, {France, "Grenoble"},
   {Switzerland, "La Chaux de Fonds"}, {Germany, "Frankfurt am Main"}, {Germany, "Trier"}, {Germany, "Duisburg"}, {GreatBritain, "Swansea"}, {GreatBritain, "Manchester"}, {France, "Le Havre"}, {GreatBritain, "London"}, {Germany, "Bremerhaven"},
@@ -71,8 +82,29 @@ const cityByCountry cities[] = {
   {Czechia, "Praha"}, {Czechia, "Decin"}, {Germany, "Berlin"}, {Sweden, "Gothenburg"}, {Sweden, "Stockholm"}, {Sweden, "Kalmar"}, {Sweden, "Joenkoeping"}, {Germany, "Donaueschingen"}, {Norway, "Oslo"}, {Germany, "Stuttgart"},
   {Italy, "Napoli"}, {Italy, "Ancona"}, {Italy, "Bari"}, {Hungary, "Budapest"}, {Spain, "Madrid"}, {Spain, "Bilbao"}, {Italy, "Palermo"}, {Spain, "Palma de Mallorca"}, {Spain, "Valencia"}, {Spain, "Barcelona"}, {Andorra, "Andorra"},
   {Spain, "Sevilla"}, {Portugal, "Lissabon"}, {Italy, "Sassari"}, {Spain, "Gijon"}, {Ireland, "Galway"}, {Ireland, "Dublin"}, {GreatBritain, "Glasgow"}, {Norway, "Stavanger"}, {Norway, "Trondheim"}, {Sweden, "Sundsvall"}, {Poland, "Gdansk"},
-  {Poland, "Warszawa"}, {Poland, "Krakow"}, {Sweden, "Umea"}, {Sweden, "Oestersund"}, {Switzerland, "Samedan"}, {Croatia, "Zagreb"}, {Switzerland, "Zermatt"}, {Croatia, "Split"}
+  {Poland, "Warszawa"}, {Poland, "Krakow"}, {Sweden, "Umea"}, {Sweden, "Oestersund"}, {Switzerland, "Samedan"}, {Croatia, "Zagreb"}, {Switzerland, "Zermatt"}, {Croatia, "Split"}, {nullptr, nullptr}
 };
+
+
+const countryBycode *findCountryByName( const char* countryName ) {
+  int citiesLength = (sizeof(cities)/sizeof(cityByCountry)) -1;
+  for( int i=0; i< citiesLength; i++ ) {
+    if( strcmp( cities[i].country.name, countryName ) == 0 ) {
+      return &cities[i].country;
+    }
+  }
+  return nullptr;
+}
+
+const char *findCityByName( const char* cityName ) {
+  int citiesLength = (sizeof(cities)/sizeof(cityByCountry)) -1;
+  for( int i=0; i< citiesLength; i++ ) {
+    if( strcmp( cities[i].name, cityName ) == 0 ) {
+      return cityName;
+    }
+  }
+  return nullptr;
+}
 
 
 iconByLabel weather[] = {
@@ -796,6 +828,8 @@ void showWeather() {
       significantweather[fourdayforecast] = weatherunbinary(8, 12);
     }
 
+
+
     sprintf( str, "Area 4day f/c =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name);
     Serial.println( str );
     out += String(str);
@@ -930,8 +964,16 @@ void showWeather() {
   //Serial.println( str );
   //out += String(str);
   #ifdef DCF77_DO_WEATHER
-    //updateScroll( out );
-    updateScroll( citiesNames );
-    updateIcons( icon1, icon2, icon3 );
+
+    if(  ( cities[twodayforecast].country  == watchedCountry && strcmp( cities[twodayforecast].name, watchedCity ) == 0 )
+      || ( cities[fourdayforecast].country == watchedCountry && strcmp( cities[fourdayforecast].name, watchedCity ) == 0)
+    ) {
+      Serial.println("Country + city match, should update scroll and icons !!");
+      //updateScroll( out );
+      updateScroll( citiesNames );
+      updateIcons( icon1, icon2, icon3 );
+    } else {
+      Serial.println("Forecast for this country+city will not be displayed");
+    }
   #endif
 }

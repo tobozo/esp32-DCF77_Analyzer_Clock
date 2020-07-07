@@ -7,7 +7,7 @@
 #define DCF77_pdnPort  26 // optional, DCF77 power down port
 #define DCF77_gainPort 32 // optional, DCF77 gain port
 #define DCF77PIN       21 // input  - DCF signal from antenna pcb. Pin must be an interrupt input!
-#define DCF77_DO_WEATHER  // handle weather data (comment this out to get rid of the text scroll)
+#define DCF77_DO_WEATHER  // handle weather data (comment this out to get rid of the text scroll and/or weather icons)
 
 // RTC module (DS1307) support, optional but strongly recommended
 #define DS1307_SDA     33

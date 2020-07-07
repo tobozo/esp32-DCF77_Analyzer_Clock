@@ -7,6 +7,19 @@
 #include "Config.h"
 #include "SpriteSheet.h"
 
+
+#ifdef DCF77_DO_WEATHER
+  #include <Preferences.h>
+  Preferences prefs;
+  static int maxEntriesPerPage = 10;
+  static int entriesIndex = -1;
+  static bool pickedCity = false;
+  static unsigned long pickerTimeout = 5000;
+  static unsigned long beforePicking = millis();
+  String preferredCountry = "";
+  String preferredCity = "";
+#endif
+
 #ifdef USE_RTC
   #include "DS1307RTC.h" // a custom DS1307 library that returns time as a time_t
   DS1307RTC RTC;
@@ -24,13 +37,6 @@ static xSemaphoreHandle mux = NULL; // this is needed to prevent rendering colli
 // between scrollpanel and heap graph
 #define takeMuxSemaphore() if( mux ) { xSemaphoreTake( mux, portMAX_DELAY ); log_v( "Took Semaphore" ); }
 #define giveMuxSemaphore() if( mux ) { xSemaphoreGive( mux ); log_v( "Gave Semaphore" ); }
-
-
-struct boxStyle {
-  std::uint32_t textColor;
-  std::uint32_t fillColor;
-  boxStyle( std::uint32_t  t, std::uint32_t  f ) : textColor(t), fillColor(f) { }
-};
 
 
 // this is just lgfx::TextStyle with a constructor
@@ -58,6 +64,14 @@ struct FontStyle {
   }
 };
 
+
+struct BoxStyle {
+  const std::uint32_t fillColor;
+  FontStyle* style;
+  BoxStyle( const std::uint32_t  f, FontStyle *s ) : fillColor(f), style(s) { }
+};
+
+
 // helper for setFontStyle
 void setTextStyle( TFT_eSprite *sprite, TextStyle *style ) {
   lgfx::TextStyle myStyle; // why no constructor ??
@@ -77,6 +91,7 @@ void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle ) {
 }
 
 
+
 #if defined( ARDUINO_M5Stack_Core_ESP32 ) || defined( ARDUINO_M5STACK_FIRE )
   #include "UI_320x240.h"
 #else
@@ -85,9 +100,6 @@ void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle ) {
 
 #include "DCF77.h"
 
-
-boxStyle *BoxSelected = new boxStyle( TFT_LIGHTGRAY, TFT_WHITE );
-boxStyle *BoxUnSelected = new boxStyle( TFT_DARKGRAY, TFT_LIGHTGRAY );
 
 static TFT_eSprite sprite = TFT_eSprite( &tft );
 
@@ -140,6 +152,9 @@ float r4 = float_r4; // inner 10's label
 
 enum UIModes {
   DCF_CLOCK, // default
+  #ifdef DCF77_DO_WEATHER
+  DCF_SETUP,
+  #endif
   COOK_TIMER // bonus ^^
 };
 
@@ -195,6 +210,11 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
       longPushCounter = 0;
       // long press = switch UI mode
       switch( UIMode ) {
+        #ifdef DCF77_DO_WEATHER
+          case DCF_SETUP:
+            // TODO: find something to do with long press when in setup mode :-)
+          break;
+        #endif
         case DCF_CLOCK:
           UIMode = COOK_TIMER;
           cookTimerSetup();
@@ -208,6 +228,13 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
       while( M5.BtnC.isPressed() ) M5.update();
     }
     switch( UIMode ) {
+      #ifdef DCF77_DO_WEATHER
+        case DCF_SETUP:
+          if ( M5.BtnA.wasPressed() ) { entriesIndex--; pickerTimeout = 600000; beforePicking = millis(); log_w("entriesIndex : %d", entriesIndex ); }
+          if ( M5.BtnB.wasPressed() ) { entriesIndex++; pickerTimeout = 600000; beforePicking = millis(); log_w("entriesIndex : %d", entriesIndex ); }
+          if ( M5.BtnC.wasPressed() ) pickedCity = true;
+        break;
+      #endif
       case DCF_CLOCK:
         if( M5.BtnC.isPressed() ) longPushCounter++;
         else longPushCounter = 0;
@@ -221,7 +248,7 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
         else { longPushCounter = 0; CookTimerButtonPos = BUTTON_NEUTRAL; }
       break;
     }
-    delay(50);
+    //delay(50);
   }
 
 #else
@@ -569,10 +596,11 @@ void LedWeekStatus( int weekDay, int status ) {
   int xpos = tft.width() - ( weekDayNamesWidth + 1 );
   int ypos = ( tft.height() - (LedWeekStatusFontHeight) ) - 3;
   int weekDayBlockWidth = LedWeekStatusFontWidth + 2;
-  int vpos = 0;
+  int vpos = -1;
 
   switch ( weekDay ) {
     case 22: // LED_SUNDAY    // output - LED - Sunday
+      vpos = 0;
       xpos += 0;
     break;
     case 23: // LED_MONDAY    // output - LED - Monday
@@ -601,27 +629,24 @@ void LedWeekStatus( int weekDay, int status ) {
     break;
     case 29: // LED_CEST      // output - LED - Summertime CEST
       takeMuxSemaphore();
-      setFontStyle( &sprite, LedWeekStatusFontStyle );
-      sprite.fillRect( CESTXpos, CETCESTYPos - LedWeekStatusFontHeight - 1, CESTWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_WHITE : TFT_LIGHTGRAY);
-      sprite.setTextColor( status ? TFT_LIGHTGRAY : TFT_DARKGRAY );
+      setFontStyle( &sprite, status ?  BoxSelected->style : BoxUnSelected->style );
+      sprite.fillRect( CESTXpos, CETCESTYPos - LedWeekStatusFontHeight - 1, CESTWidth + 2, LedWeekStatusFontHeight+1, status ? BoxSelected->fillColor : BoxUnSelected->fillColor );
       sprite.drawString( "CEST", CESTXpos + 1, (CETCESTYPos - LedWeekStatusFontHeight) );
       giveMuxSemaphore();
       return;
     break;
     case 30: // LED_CET       // output - LED - Wintertime CET
       takeMuxSemaphore();
-      setFontStyle( &sprite, LedWeekStatusFontStyle );
-      sprite.fillRect( CETXPos, CETCESTYPos - LedWeekStatusFontHeight - 1, CETWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_WHITE : TFT_LIGHTGRAY );
-      sprite.setTextColor( status ? TFT_LIGHTGRAY : TFT_DARKGRAY );
+      setFontStyle( &sprite, status ?  BoxSelected->style : BoxUnSelected->style );
+      sprite.fillRect( CETXPos, CETCESTYPos - LedWeekStatusFontHeight - 1, CETWidth + 2, LedWeekStatusFontHeight+1, status ? BoxSelected->fillColor : BoxUnSelected->fillColor );
       sprite.drawString( "CET", CETXPos + 1, (CETCESTYPos - LedWeekStatusFontHeight) );
       giveMuxSemaphore();
       return;
     break;
     case 31: // LED_LEAPYEAR  // output - LED - Leap year
       takeMuxSemaphore();
-      setFontStyle( &sprite, LedWeekStatusFontStyle );
-      sprite.fillRect( LEAPXPos, LeapYearYpos - LedWeekStatusFontHeight - 1, LEAPWidth + 2, LedWeekStatusFontHeight+1, status ? TFT_WHITE : TFT_LIGHTGRAY );
-      sprite.setTextColor( status ? TFT_LIGHTGRAY : TFT_DARKGRAY );
+      setFontStyle( &sprite, status ?  BoxSelected->style : BoxUnSelected->style );
+      sprite.fillRect( LEAPXPos, LeapYearYpos - LedWeekStatusFontHeight - 1, LEAPWidth + 2, LedWeekStatusFontHeight+1, status ? BoxSelected->fillColor : BoxUnSelected->fillColor );
       sprite.drawString( "LEAP", LEAPXPos + 1, (LeapYearYpos - LedWeekStatusFontHeight) );
       giveMuxSemaphore();
       return;
@@ -630,10 +655,9 @@ void LedWeekStatus( int weekDay, int status ) {
       char weekNumStr[5];
       sprintf( weekNumStr, "W:%02d", weekNumber );
       takeMuxSemaphore();
-      setFontStyle( &sprite, LedWeekStatusFontStyle );
+      setFontStyle( &sprite, weekNumber > 0 ?  BoxSelected->style : BoxUnSelected->style );
       tmpFontWidth = sprite.textWidth( weekNumStr );
-      sprite.fillRect( tft.width() - (tmpFontWidth + 2), WeekNumberYpos - 1, tmpFontWidth + 2, LedWeekStatusFontHeight+1, weekNumber > 0 ? TFT_WHITE : TFT_LIGHTGRAY );
-      sprite.setTextColor( weekNumber > 0 ? TFT_LIGHTGRAY : TFT_DARKGRAY );
+      sprite.fillRect( tft.width() - (tmpFontWidth + 2), WeekNumberYpos - 1, tmpFontWidth + 2, LedWeekStatusFontHeight+1, weekNumber > 0 ? BoxSelected->fillColor : BoxUnSelected->fillColor );
       sprite.drawString( String( weekNumStr ), tft.width() - (tmpFontWidth + 1), WeekNumberYpos );
       giveMuxSemaphore();
       return;
@@ -644,14 +668,16 @@ void LedWeekStatus( int weekDay, int status ) {
   }
 
   takeMuxSemaphore();
-  switch (status) {
-    case LOW:
-      sprite.fillCircle( xpos, ypos, 1, TFT_DARKGRAY );
-      sprite.drawCircle( xpos, ypos, 1, TFT_GRAY );
-      break;
-    case HIGH:
-      sprite.fillCircle( xpos, ypos, 1, TFT_ORANGE );
-      break;
+  if( vpos > -1 ) {
+    switch (status) {
+      case LOW:
+        sprite.fillCircle( xpos, ypos, 1, TFT_DARKGRAY );
+        sprite.drawCircle( xpos, ypos, 1, TFT_GRAY );
+        break;
+      case HIGH:
+        sprite.fillCircle( xpos, ypos, 1, TFT_ORANGE );
+        break;
+    }
   }
 
   setFontStyle( &sprite, LedWeekStatusFontStyle );
@@ -659,7 +685,7 @@ void LedWeekStatus( int weekDay, int status ) {
 
   char weekStr[] = "SMTWTFS";
   for ( byte pos = 0; pos < sizeof(weekStr); pos++ ) {
-    if ( vpos != 0 && vpos == pos ) {
+    if ( vpos > -1 && vpos == pos ) {
       sprite.setTextColor( status >= 0 ? TFT_DARKGRAY : TFT_GRAY );
     } else {
       sprite.setTextColor( TFT_GRAY );
@@ -773,9 +799,7 @@ void drawRing() {
     }
     if ( ledNum % 10 == 0 ) {
       sprite.drawLine( x2, y2, x3, y3, TFT_LIGHTGRAY );
-      //tft_getTextBounds( String( ledNum ), (int16_t)0, (int16_t)0,  &x, &y, &w, &h );
-      //h = sprite.textWidth( String( ledNum ) );
-      sprite.drawString( String(ledNum), x4, y4);
+      sprite.drawString( String(ledNum).c_str(), x4, y4);
     }
 
     for ( float l = ledNum - 0.5; l <= ledNum + 0.5; l += MinuteSteps ) {
@@ -885,7 +909,140 @@ void scheduleBuzz( uint16_t note, int duration ) {
 }
 
 
-void initPins() {
+#ifdef DCF77_DO_WEATHER
+
+  char countryCityHolder[64];
+  int citiesLength = 0;
+  int halfPage = 0;
+
+  void paginateCities() {
+
+    if( entriesIndex < 0 ) {
+      entriesIndex = citiesLength-1;
+    }
+    if( entriesIndex >= citiesLength ) {
+      entriesIndex = 0;
+    }
+
+    int pageStart = entriesIndex - halfPage;
+    int pageEnd   = entriesIndex + halfPage ;
+
+    if( entriesIndex < halfPage ) {
+      pageEnd+=halfPage;
+    }
+
+    if( pageEnd >= citiesLength ) {
+      pageEnd = citiesLength-1;
+    }
+    if( pageStart < 0 ) {
+      pageStart = 0;
+    }
+
+    log_d("Found %d cities, paginating from %d to %d (index=%d)", citiesLength, pageStart, pageEnd, entriesIndex );
+
+    sprite.fillScreen( CountryCityFontStylePicoDisabled->style->back_rgb888 );
+
+    uint8_t linenum = 0;
+
+    for( int i=pageStart; i<=pageEnd; i++ ) {
+      if( cities[i].name == nullptr ) continue;
+      if( i == entriesIndex ) {
+        setFontStyle( &sprite, CountryCityFontStylePicoEnabled );
+      } else {
+        setFontStyle( &sprite, CountryCityFontStylePicoDisabled );
+      }
+      sprintf( countryCityHolder, " %s : %s ", cities[i].country.name, cities[i].name );
+      sprite.drawString( countryCityHolder, 0, linenum*RTCDateFontHeight );
+      linenum++;
+    }
+    sprite.pushSprite( 0, 0/*, TFT_BLACK*/ );
+  }
+
+
+  void LoadCountryPref( const countryBycode* country ) {
+    watchedCountry = (countryBycode*)country;
+  }
+  void LoadCityPref( const char* city ) {
+    watchedCity = (char*)city;
+  }
+
+
+  void CountryCityWizard( unsigned long timeout ) {
+    #ifndef USE_BUTTONS
+      // TODO: handle serial input instead of blaming the lack of HID
+      log_e("This feature requires buttons!");
+      return;
+    #endif
+    maxEntriesPerPage = tft.height() / RTCDateFontHeight;
+    halfPage = maxEntriesPerPage / 2;
+    log_d("maxEntriesPerPage / citiesLength / halfPage : %d / %d / %d", maxEntriesPerPage, citiesLength, halfPage);
+    for( int i=0; i<citiesLength; i++ ) {
+      log_d("Index / Country / City: %d / %s / %s",  i, cities[i].country.name, cities[i].name );
+    }
+    UIMode = DCF_SETUP;
+    beforePicking = millis();
+    bool has_timed_out = false;
+    pickerTimeout = timeout;
+    while( !pickedCity ) {
+      checkButtons();
+      paginateCities();
+      if( beforePicking + pickerTimeout < millis() ) {
+        has_timed_out = true;
+        break;
+      }
+    }
+    if(  preferredCountry != String( cities[entriesIndex].country.name )
+      || preferredCity    != String( cities[entriesIndex].name ) ) {
+      // save only if choice changed
+      log_w("Prefs have changed, saving!");
+      prefs.begin("DCF77Prefs", false);
+      prefs.putString( "country", cities[entriesIndex].country.name );
+      prefs.putString( "city", cities[entriesIndex].name );
+      prefs.end();
+    }
+    LoadCountryPref( &cities[entriesIndex].country );
+    LoadCityPref( cities[entriesIndex].name );
+    sprite.fillScreen( TFT_BLACK );
+    sprite.pushSprite( 0, 0 );
+    UIMode = DCF_CLOCK;
+  }
+
+
+  void InitPrefs() {
+    prefs.begin("DCF77Prefs", true);
+    preferredCountry = prefs.getString("country");
+    preferredCity    = prefs.getString("city");
+    prefs.end();
+
+    citiesLength = ( sizeof(cities) / sizeof(cityByCountry) ) -1;
+
+    if( preferredCountry != "" ) {
+      log_w("Found preferredCountry '%s' in NVS, will compare with local list", preferredCountry.c_str() );
+      const countryBycode* country = findCountryByName( preferredCountry.c_str() );
+      if( country != nullptr ) {
+        LoadCountryPref( country );
+        if( preferredCity != "" ) {
+          log_w("Found preferredCity '%s' in NVS, will compare with local list", preferredCity.c_str() );
+          const char* city = findCityByName( preferredCity.c_str() );
+          if( city != nullptr ) {
+            LoadCityPref( city );
+            for( int i=0; i<citiesLength; i++ ) {
+              if( strcmp( city, cities[i].name )==0 && strcmp( country->name, cities[i].country.name )==0 ) {
+                entriesIndex = i;
+                CountryCityWizard( 5000 );
+                return;
+              }
+            }
+          } // else invalid city or end of array
+        } // else empty city name returned from prefs
+      } // else invalid country or end of array
+    } // else empty country name returned from prefs
+    CountryCityWizard( 600000 );
+  }
+#endif
+
+
+void InitPins() {
   // initialize PIN connections
   pinMode( DCF77PIN,           INPUT );
   #ifdef DCF77_pdnPort
@@ -955,15 +1112,12 @@ static void InitUI() {
   } else {
     log_n("Successfully created logoSpritePtr");
   }
-  LogoSprite.fillSprite( TFT_BLACKISH );
 
   TFT_HALFWIDTH = tft.width() / 2;
   TFT_HALFHEIGHT = tft.height() / 2;
 
   uint16_t centericonposx = ( TFT_HALFWIDTH - 32 / 2 );
   uint16_t centericonposy = ( TFT_HALFHEIGHT - 32 / 2 );
-
-  drawIconTask( atomic, centericonposx, centericonposy );
 
   setFontStyle( &sprite, LedWeekStatusFontStyle );
   getTextBounds( &sprite, "0", &LedWeekStatusFontWidth, &LedWeekStatusFontHeight );
@@ -989,13 +1143,19 @@ static void InitUI() {
   setFontStyle( &sprite,  myRTCDateFontStyle );
   getTextBounds( &sprite, "0", &w, &RTCDateFontHeight );
 
-  setFontStyle( &sprite, LedWeekStatusFontStyle );
+  setFontStyle( &sprite, BoxSelected->style );
   getTextBounds( &sprite, "LEAP", &LEAPWidth, &h );
   getTextBounds( &sprite, "CET", &CETWidth, &h );
   getTextBounds( &sprite, "CEST", &CESTWidth, &h );
   CESTXpos = tft.width() - ( CESTWidth + 2 );
   CETXPos  = tft.width() - ( CETWidth + 2 + 2 + CESTWidth + 2 );
   LEAPXPos = tft.width() - ( LEAPWidth + 2 );
+
+  #ifdef DCF77_DO_WEATHER
+    InitPrefs();
+  #endif
+
+  LogoSprite.fillSprite( TFT_BLACKISH );
 
   setFontStyle( &sprite, LedParityStatusFontStyle );
   getTextBounds( &sprite, "01100101 P", &tmpFontWidth, &tmpFontHeight );
@@ -1020,6 +1180,11 @@ static void InitUI() {
   LedWeekStatus( LED_CEST, LOW );
   LedWeekStatus( LED_CET, LOW );
   LedWeekStatus( LED_LEAPYEAR, LOW );
+
+  drawIcon( atomic, centericonposx, centericonposy );
+
+  setRingCoords(); // cache ring coords
+  drawRing();
 
   sprite.pushSprite( 0, 0, TFT_BLACK );
 }
@@ -1055,9 +1220,9 @@ void displayData( void ) {
   }
   // display Leap Year LED
   if ( leapYear == 1 ) {
-    LedWeekStatus( LED_LEAPYEAR, LOW );
-  } else {
     LedWeekStatus( LED_LEAPYEAR, HIGH );
+  } else {
+    LedWeekStatus( LED_LEAPYEAR, LOW );
   }
   LedWeekStatus( LED_WEEKNUMBER, weekNumber );
   Serial.printf( "dcfWeekDay: %d, weekNumber: %d, dcfDay: %d, dcfMonth: %d, dcfYear: %d, dcfDST: %d, leapYear: %d\n", dcfWeekDay, weekNumber, dcfDay, dcfMonth, dcfYear, dcfDST, leapYear );
@@ -1108,8 +1273,9 @@ void LedTest() {
 void initialize(void) {
   M5.begin();
 
+  InitPins();
   InitUI();
-  initPins();
+
   leadingEdge         = 0;
   trailingEdge        = 0;
   previousLeadingEdge = 0;
@@ -1120,8 +1286,6 @@ void initialize(void) {
     DCFbitFinalBuffer[i] = 0;
   }
 
-  setRingCoords(); // cache ring coords
-  drawRing();
   initSpeaker();
   initRTC();
   if ( PERFORM_LED_TEST == 1 ) {

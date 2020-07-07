@@ -57,6 +57,7 @@ static void mainTask( void * param ) {
     log_e("Starting buttons task");
     while( true ) {
       checkButtons();
+      delay(50);
       /*
       if( currentMode != UIMode ) {
         takeMuxSemaphore();
@@ -187,7 +188,7 @@ void finalizeBufferTask( void *param ) {
 static void timerTasks( void *param ) {
   log_w( "Entering timers task" );
   #ifdef DCF77_DO_WEATHER
-    initScroll();
+    //initScroll();
   #endif
   byte lastPushCounter = 0;
   while(1) {

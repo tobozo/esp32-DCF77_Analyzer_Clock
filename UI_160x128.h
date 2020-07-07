@@ -27,17 +27,17 @@ static uint16_t WeekDayLedYpos   = 117;
 TextStyle *myRTCDateTimeTextStyleOK = new TextStyle( 0xccffccU, 0x222222U, 1, 1, middle_center, false,  true );
 TextStyle *myRTCDateTimeTextStyleKO = new TextStyle( 0xff8888U, 0x222222U, 1, 1, middle_center, false,  true );
 TextStyle *myRTCDateTimeTextStyleNA = new TextStyle( 0xddddddU, 0x222222U, 1, 1, middle_center, false,  true );
-TextStyle *RingLabelsTextStyle      = new TextStyle( 0x444444U, 0x222222U, 1, 1, middle_center, false,  true );
-TextStyle *ErrorsCountStyleOK       = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *ErrorsCountStyleKO       = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedDCFStatusStyleOK      = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedDCFStatusStyleKO      = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedParityStatusStyleNA   = new TextStyle( 0x888888U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedParityStatusStyleOK   = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedParityStatusStyleKO   = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedErrorStatusStyleGray  = new TextStyle( 0x444444U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedErrorStatusStyleRed   = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false,  true );
-TextStyle *LedErrorStatusStyleGreen = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false,  true );
+TextStyle *RingLabelsTextStyle      = new TextStyle( 0x888888U, 0x222222U, 1, 1, middle_center, false,  true );
+TextStyle *ErrorsCountStyleOK       = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *ErrorsCountStyleKO       = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedDCFStatusStyleOK      = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedDCFStatusStyleKO      = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedParityStatusStyleNA   = new TextStyle( 0x888888U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedParityStatusStyleOK   = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedParityStatusStyleKO   = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedErrorStatusStyleGray  = new TextStyle( 0x444444U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedErrorStatusStyleRed   = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false, true );
+TextStyle *LedErrorStatusStyleGreen = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false, true );
 TextStyle *LedWeekStatusStyle       = new TextStyle( 0x888888U, 0xffffffU, 1, 1, top_left, false, true );
 TextStyle *LedDisplayStylePingtime  = new TextStyle( 0xffa500U, 0x222222U, 1, 1, top_left, false, true );
 TextStyle *LedDisplayStyleLeftover  = new TextStyle( 0xffff00U, 0x222222U, 1, 1, top_left, false, true );
@@ -65,4 +65,19 @@ FontStyle *LedErrorStatusFontStyle  = new FontStyle( &Picopixel,    LedErrorStat
 FontStyle *LedWeekStatusFontStyle   = new FontStyle( &Picopixel,    LedWeekStatusStyle );
 FontStyle *LedDisplayFontStyle      = new FontStyle( &Picopixel,    LedDisplayStyle );
 FontStyle *myTimerFontStyle         = new FontStyle( &fonts::Font0, myTimerStyle );
-FontStyle *scrollFontStyle           = new FontStyle( &fonts::Font2, scrollStyle );
+FontStyle *scrollFontStyle          = new FontStyle( &fonts::Font2, scrollStyle );
+
+// for weeknum/leap/cet/cest boxes
+TextStyle *BoxStyleEnabled       = new TextStyle( 0x888888U, 0xffffffU, 1, 1, top_left, false, true );
+TextStyle *BoxStyleDisabled      = new TextStyle( 0x222222U, 0x888888U, 1, 1, top_left, false, true );
+FontStyle *BoxFontStylePicoEnabled  = new FontStyle( &Picopixel, BoxStyleEnabled );
+FontStyle *BoxFontStylePicoDisabled = new FontStyle( &Picopixel, BoxStyleDisabled );
+BoxStyle  *BoxSelected   = new BoxStyle( BoxStyleEnabled->back_rgb888,  BoxFontStylePicoEnabled );
+BoxStyle  *BoxUnSelected = new BoxStyle( BoxStyleDisabled->back_rgb888, BoxFontStylePicoDisabled );
+
+
+TextStyle *CountryCityStyleEnabled       = new TextStyle( 0x888888U, 0xffffffU, 1, 1, top_left, false, true );
+TextStyle *CountryCityStyleDisabled      = new TextStyle( 0x222222U, 0x888888U, 1, 1, top_left, false, true );
+FontStyle *CountryCityFontStylePicoEnabled  = new FontStyle( &fonts::Font0, CountryCityStyleEnabled );
+FontStyle *CountryCityFontStylePicoDisabled = new FontStyle( &fonts::Font0, CountryCityStyleDisabled );
+
