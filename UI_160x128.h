@@ -14,6 +14,8 @@
 #define TFT_GRAY      tft.color565( 0x44, 0x44, 0x44 ) // 25%
 #define TFT_DARKGRAY  tft.color565( 0x22, 0x22, 0x22 ) // 12%
 #define TFT_BLUEGRAY  tft.color565( 0x22, 0x22, 0x44 )
+#define TFT_DARKRED   tft.color565( 0xBB, 0x00, 0x00 )
+#define TFT_GREENISH  tft.color565( 0x00, 0xdd, 0x00 )
 
 static uint16_t DCFBitBufferYPos = 8;
 static uint16_t CETCESTYPos      = 118;
@@ -38,7 +40,7 @@ TextStyle *LedParityStatusStyleKO   = new TextStyle( 0xff0000U, 0x222222U, 1, 1,
 TextStyle *LedErrorStatusStyleGray  = new TextStyle( 0x444444U, 0x222222U, 1, 1, top_left, false, true );
 TextStyle *LedErrorStatusStyleRed   = new TextStyle( 0xff0000U, 0x222222U, 1, 1, top_left, false, true );
 TextStyle *LedErrorStatusStyleGreen = new TextStyle( 0x00ff00U, 0x222222U, 1, 1, top_left, false, true );
-TextStyle *LedWeekStatusStyle       = new TextStyle( 0x888888U, 0xffffffU, 1, 1, top_left, false, true );
+TextStyle *LedWeekStatusStyle       = new TextStyle( 0x888888U, 0xffffffU, 1, 1, middle_center, false, true );
 TextStyle *LedDisplayStylePingtime  = new TextStyle( 0xffa500U, 0x222222U, 1, 1, top_left, false, true );
 TextStyle *LedDisplayStyleLeftover  = new TextStyle( 0xffff00U, 0x222222U, 1, 1, top_left, false, true );
 TextStyle *myTimerStyle             = new TextStyle( 0xddddddU, 0x222222U, 1, 1, middle_center, false, true );

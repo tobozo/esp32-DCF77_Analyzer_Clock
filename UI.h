@@ -592,39 +592,79 @@ void LedErrorStatus( byte lednum, int status ) {
 }
 
 
+static const char weekStr[] = "SMTWTFS";
+
+void drawWeekDays( int daynum ) {
+
+  int hpos = sprite.width();
+  int vpos = sprite.height();
+  int margin = 1;
+
+  int boxWidth = LedWeekStatusFontWidth + (margin);
+  int boxHeight = (LedWeekStatusFontHeight + (margin*2))-1;
+
+  int boxCenterX = boxWidth/2 - margin;
+  int boxCenterY = boxHeight/2 + margin*2;
+
+  hpos -= (boxWidth*7);
+  vpos -= (boxHeight);
+
+  setFontStyle( &sprite, LedWeekStatusFontStyle );
+
+  for ( byte pos = 0; pos < 7; pos++ ) {
+    if ( daynum > -1 && daynum == pos ) {
+      sprite.fillCircle( hpos+(boxWidth/2), vpos-2, 1, TFT_ORANGE );
+      sprite.fillRect( hpos, vpos, boxWidth, boxHeight, TFT_DARKRED );
+      sprite.setTextColor( TFT_UGRAY );
+    } else {
+      sprite.fillCircle( hpos+(boxWidth/2), vpos-2, 1, TFT_DARKGRAY );
+      sprite.drawCircle( hpos+(boxWidth/2), vpos-2, 1, TFT_GRAY );
+      if( pos == 0 || pos == 6 ) {
+        sprite.fillRect( hpos, vpos, boxWidth, boxHeight, TFT_ORANGE );
+      } else {
+        sprite.fillRect( hpos, vpos, boxWidth, boxHeight, TFT_LIGHTGRAY );
+      }
+      sprite.setTextColor( TFT_GRAY );
+    }
+    sprite.drawChar( weekStr[pos],  hpos+boxCenterX, vpos+boxCenterY );
+    hpos += boxWidth;
+  }
+
+}
+
 void LedWeekStatus( int weekDay, int status ) {
   int xpos = tft.width() - ( weekDayNamesWidth + 1 );
   int ypos = ( tft.height() - (LedWeekStatusFontHeight) ) - 3;
   int weekDayBlockWidth = LedWeekStatusFontWidth + 2;
-  int vpos = -1;
+  int wpos = -1;
 
   switch ( weekDay ) {
     case 22: // LED_SUNDAY    // output - LED - Sunday
-      vpos = 0;
+      wpos = 0;
       xpos += 0;
     break;
     case 23: // LED_MONDAY    // output - LED - Monday
-      vpos = 1;
+      wpos = 1;
       xpos += weekDayBlockWidth;
     break;
     case 24: // LED_TUESDAY   // output - LED - Tuesday
-      vpos = 2;
+      wpos = 2;
       xpos += weekDayBlockWidth * 2;
     break;
     case 25: // LED_WEDNESDAY // output - LED - Wednesday
-      vpos = 3;
+      wpos = 3;
       xpos += weekDayBlockWidth * 3;
     break;
     case 26: // LED_THURSDAY  // output - LED - Thursday
-      vpos = 4;
+      wpos = 4;
       xpos += weekDayBlockWidth * 4;
     break;
     case 27: // LED_FRIDAY    // output - LED - Friday
-      vpos = 5;
+      wpos = 5;
       xpos += weekDayBlockWidth * 5;
     break;
     case 28: // LED_SATURDAY  // output - LED - Saturday
-      vpos = 6;
+      wpos = 6;
       xpos += weekDayBlockWidth * 6;
     break;
     case 29: // LED_CEST      // output - LED - Summertime CEST
@@ -668,37 +708,17 @@ void LedWeekStatus( int weekDay, int status ) {
   }
 
   takeMuxSemaphore();
-  if( vpos > -1 ) {
-    switch (status) {
-      case LOW:
-        sprite.fillCircle( xpos, ypos, 1, TFT_DARKGRAY );
-        sprite.drawCircle( xpos, ypos, 1, TFT_GRAY );
-        break;
-      case HIGH:
-        sprite.fillCircle( xpos, ypos, 1, TFT_ORANGE );
-        break;
-    }
-  }
-
-  setFontStyle( &sprite, LedWeekStatusFontStyle );
-  sprite.setCursor( WeekDayNamesXpos, WeekDayNamesYpos );
-
-  char weekStr[] = "SMTWTFS";
-  for ( byte pos = 0; pos < sizeof(weekStr); pos++ ) {
-    if ( vpos > -1 && vpos == pos ) {
-      sprite.setTextColor( status >= 0 ? TFT_DARKGRAY : TFT_GRAY );
-    } else {
-      sprite.setTextColor( TFT_GRAY );
-    }
-    sprite.print( weekStr[pos] );
+  if( wpos > -1 ) {
+    drawWeekDays( wpos );
   }
   giveMuxSemaphore();
 }
 
 
-void setRingLed( byte ringNum, byte ledNum, bool enable, uint16_t color ) {
+void setRingLed( byte ringNum, byte ledNum, bool enable, bool clear ) {
   //float i = ( float( ledNum - 60 / 2 ) / 60) * TWO_PI;
   float x1, y1;
+  uint16_t fillcolor, shinecolor;
   byte r = 0;
   switch ( ringNum ) {
     case 0: // inner
@@ -722,20 +742,26 @@ void setRingLed( byte ringNum, byte ledNum, bool enable, uint16_t color ) {
       case 28: // p1
       case 35: // p2
       case 58: // p3
-        color = TFT_GREEN;
+        fillcolor = TFT_GREENISH;
+        shinecolor = TFT_WHITE;
         break;
       default:
-        color = TFT_RED;
+        fillcolor = TFT_RED;
+        shinecolor = TFT_UGRAY;
     }
-    sprite.fillCircle( x1, y1, r, color );
+    sprite.fillCircle( x1, y1, r, fillcolor );
     if (r > 1) {
-      sprite.fillTriangle( x1, y1 - 1, x1 + 1, y1 - 1, x1 + 1, y1, TFT_UGRAY );
+      sprite.fillTriangle( x1, y1 - 1, x1 + 1, y1 - 1, x1 + 1, y1, shinecolor );
     }
   } else {
-    sprite.fillCircle( x1, y1, r, TFT_DARKGRAY );
-    sprite.drawCircle( x1, y1, r, TFT_LIGHTGRAY );
+    if( clear ) {
+      sprite.fillCircle( x1, y1, r, TFT_DARKGRAY );
+      sprite.drawCircle( x1, y1, r, TFT_LIGHTGRAY );
+    } else {
+      sprite.fillCircle( x1, y1, r, TFT_LIGHTGRAY );
+      sprite.fillTriangle( x1, y1 - 1, x1 + 1, y1 - 1, x1 + 1, y1, TFT_WHITE );
+    }
   }
-  //sprite.pushSprite( 0, 0 );
   giveMuxSemaphore();
 }
 
@@ -815,12 +841,6 @@ void drawRing() {
   giveMuxSemaphore();
 }
 
-
-void enableRing( byte ringNum, uint16_t color ) {
-  for ( uint8_t ledNum = 0; ledNum < 60; ledNum++ ) {
-    setRingLed( ringNum, ledNum, true, color );
-  }
-}
 
 /* probably unused but kept for semantics */
 void clearRing( byte ringNum ) {
@@ -1120,28 +1140,28 @@ static void InitUI() {
   uint16_t centericonposy = ( TFT_HALFHEIGHT - 32 / 2 );
 
   setFontStyle( &sprite, LedWeekStatusFontStyle );
-  getTextBounds( &sprite, "0", &LedWeekStatusFontWidth, &LedWeekStatusFontHeight );
+  getTextBounds( &sprite, "W", &LedWeekStatusFontWidth, &LedWeekStatusFontHeight );
 
   setFontStyle( &sprite, LedErrorStatusFontStyle );
-  getTextBounds( &sprite, "0", &LedErrorStatusFontWidth, &LedErrorStatusFontHeight );
+  getTextBounds( &sprite, "W", &LedErrorStatusFontWidth, &LedErrorStatusFontHeight );
 
   setFontStyle( &sprite, LedParityStatusFontStyle );
-  getTextBounds( &sprite, "0", &LedParityStatusFontWidth, &LedParityStatusFontHeight );
+  getTextBounds( &sprite, "W", &LedParityStatusFontWidth, &LedParityStatusFontHeight );
 
   setFontStyle( &sprite, LedDCFStatusFontStyle );
-  getTextBounds( &sprite, "0", &LedDCFStatusFontWidth, &LedDCFStatusFontHeight );
+  getTextBounds( &sprite, "W", &LedDCFStatusFontWidth, &LedDCFStatusFontHeight );
 
   setFontStyle( &sprite, ErrorsCountFontStyle );
-  getTextBounds( &sprite, "0", &ErrorsCountFontWidth, &ErrorsCountFontHeight );
+  getTextBounds( &sprite, "W", &ErrorsCountFontWidth, &ErrorsCountFontHeight );
 
   setFontStyle( &sprite, RingLabelsFontStyle );
-  getTextBounds( &sprite, "0", &RingLabelsFontWidth, &RingLabelsFontHeight );
+  getTextBounds( &sprite, "W", &RingLabelsFontWidth, &RingLabelsFontHeight );
 
   setFontStyle( &sprite, LedDisplayFontStyle );
-  getTextBounds( &sprite, "0", &w, &LedDisplayFontHeight );
+  getTextBounds( &sprite, "W", &w, &LedDisplayFontHeight );
 
   setFontStyle( &sprite,  myRTCDateFontStyle );
-  getTextBounds( &sprite, "0", &w, &RTCDateFontHeight );
+  getTextBounds( &sprite, "W", &w, &RTCDateFontHeight );
 
   setFontStyle( &sprite, BoxSelected->style );
   getTextBounds( &sprite, "LEAP", &LEAPWidth, &h );
@@ -1164,14 +1184,6 @@ static void InitUI() {
   sprite.setTextColor( TFT_DARKGRAY );
   sprite.drawString( "01100101 P", 1, tft.height() - (LedParityStatusFontHeight + 1)  );
 
-  setFontStyle( &sprite, LedWeekStatusFontStyle );
-  getTextBounds( &sprite, "SMTWTFS", &weekDayNamesWidth, &h );
-  sprite.fillRect( tft.width() - (weekDayNamesWidth + 3),      tft.height() - (LedWeekStatusFontHeight + 1), weekDayNamesWidth + 3,      LedWeekStatusFontHeight + 2, TFT_LIGHTGRAY );
-  sprite.fillRect( tft.width() - (weekDayNamesWidth + 3),      tft.height() - (LedWeekStatusFontHeight + 1), LedWeekStatusFontWidth + 2, LedWeekStatusFontHeight + 2, TFT_ORANGE );
-  sprite.fillRect( tft.width() - (LedWeekStatusFontWidth + 2), tft.height() - (LedWeekStatusFontHeight + 1), LedWeekStatusFontWidth + 2, LedWeekStatusFontHeight + 2, TFT_ORANGE );
-  sprite.setTextColor( TFT_DARKGRAY );
-  sprite.drawString( "SMTWTFS", WeekDayNamesXpos, WeekDayNamesYpos );
-
   LedParityStatus( 1, -1 ); // H
   LedParityStatus( 2, -1 ); // M
   LedParityStatus( 3, -1 ); // S
@@ -1185,22 +1197,19 @@ static void InitUI() {
 
   setRingCoords(); // cache ring coords
   drawRing();
+  //drawWeekDays( -1 );
 
   sprite.pushSprite( 0, 0, TFT_BLACK );
 }
 
 
 void displayData( void ) {
-  // display Day of Week on LED's
-  // first, clear all the 'Day' Led's before displaying new value
-  LedWeekStatus( LED_SUNDAY, LOW );
-  LedWeekStatus( LED_MONDAY, LOW );
-  LedWeekStatus( LED_TUESDAY, LOW );
-  LedWeekStatus( LED_WEDNESDAY, LOW );
-  LedWeekStatus( LED_THURSDAY, LOW );
-  LedWeekStatus( LED_FRIDAY, LOW );
-  LedWeekStatus( LED_SATURDAY, LOW );
-  // switch on the Weekday LED
+  if( dcfWeekDay + weekNumber + dcfDay + dcfMonth + dcfYear + dcfDST + leapYear == 0 ) {
+    // uh-oh
+    log_e("Cowardly refusing to work with an empty data load (also zero is evil)");
+    return;
+  }
+  // display Day of Week
   switch ( dcfWeekDay ) {
     case 1: LedWeekStatus( LED_MONDAY, HIGH ); break;
     case 2: LedWeekStatus( LED_TUESDAY, HIGH ); break;
@@ -1266,6 +1275,7 @@ void LedTest() {
     sprite.pushSprite( 0, 0, TFT_BLACK );
   }
   LedWeekStatus( LED_WEEKNUMBER, -1 );
+  drawWeekDays( -1 );
   sprite.pushSprite( 0, 0, TFT_BLACK );
 }
 

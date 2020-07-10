@@ -147,7 +147,7 @@ extern void error( int errorLed );
 extern void scheduleBuzz( uint16_t note, int duration );
 extern void LedErrorStatus( byte lednum, int status );
 extern void displayBufferPosition( int dcfBit );
-extern void setRingLed( byte ringNum, byte ledNum, bool enable, uint16_t color = TFT_GRAY );
+extern void setRingLed( byte ringNum, byte ledNum, bool enable, bool clear=true );
 extern void LedParityStatus( byte paritynum, int status );
 extern void LedDCFStatus( int status );
 extern void clearRing( byte ringNum );
@@ -313,7 +313,7 @@ void processDcfBit( int dcfBit ) {
   // activate the inner LED ring and diplay incoming data
   if ( dcfValidSignal == true || MinuteMarkerFlag == true ) {
     // display received bits on inner LED ring
-    setRingLed( LedRingInner, bufferPosition, dcfBit );
+    setRingLed( LedRingInner, bufferPosition, dcfBit, false );
   }
 
   //--------------------------------------------------------------------
@@ -493,7 +493,7 @@ void finalizeBuffer( void ) {
     LedDCFStatus( true );
     // copy 'contents' of inner LED ring to the outer LED ring (current time information)
     for ( uint8_t r = 0; r < 59; r++ ) {
-      setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1 );
+      setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1, false );
       // Reset inner LED ring (incoming time information)
       setRingLed( LedRingInner, r, false );
       // Reset array, positions 0-58 (=59 bits)
