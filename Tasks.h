@@ -10,7 +10,9 @@ extern void handleScroll();
 extern void displayRtcTime();
 extern void displayRtcDate();
 extern void displayData( void );
-
+#ifdef DCF77_DO_WEATHER
+extern void saveWeatherCache();
+#endif
 
 void IRAM_ATTR int0handler() {
   DCFSignalState = digitalRead( DCF77PIN );
@@ -57,7 +59,7 @@ static void mainTask( void * param ) {
     log_e("Starting buttons task");
     while( true ) {
       checkButtons();
-      delay(50);
+      vTaskDelay(50);
       /*
       if( currentMode != UIMode ) {
         takeMuxSemaphore();
@@ -130,6 +132,11 @@ static void doMinutelyTask() {
     if( UIMode == DCF_CLOCK ) {
       displayData();
     }
+
+    //#ifdef DCF77_DO_WEATHER
+    //  saveWeatherCache();
+    //#endif
+
   }
 }
 /*
@@ -144,11 +151,13 @@ void tasksEveryMinute() {
 
 
 static void doHourlyTask() {
+  // reset error counter display
   errorCounter = 0;
-  // update error counter display
-  //if( UIMode == DCF_CLOCK ) {
-    LedDisplay( DisplayBufferBitError, "R", errorCounter );
-  //}
+  LedDisplay( DisplayBufferBitError, "R", errorCounter );
+
+  #ifdef DCF77_DO_WEATHER
+    saveWeatherCache();
+  #endif
 }
 
 void tasksEveryHour() {

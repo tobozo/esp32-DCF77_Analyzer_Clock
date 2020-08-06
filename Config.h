@@ -17,6 +17,9 @@
 #define USE_RTC
 #define USE_BUTTONS
 
+// output baudrate to serial console
+#define SERIAL_SPEED 115200
+
 // some named tones to customize beep sounds (for reference)
 
 // tone off

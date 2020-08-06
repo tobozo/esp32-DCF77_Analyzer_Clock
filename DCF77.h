@@ -145,19 +145,19 @@ coords ringLedCoords[4][60];
 extern void LedDisplay( int addr, String leftOrRight, int value );
 extern void error( int errorLed );
 extern void scheduleBuzz( uint16_t note, int duration );
-extern void LedErrorStatus( byte lednum, int status );
+extern void LedErrorStatus( uint8_t lednum, int status );
 extern void displayBufferPosition( int dcfBit );
-extern void setRingLed( byte ringNum, byte ledNum, bool enable, bool clear=true );
-extern void LedParityStatus( byte paritynum, int status );
+extern void setRingLed( uint8_t ringNum, uint8_t ledNum, bool enable, bool clear=true );
+extern void LedParityStatus( uint8_t paritynum, int status );
 extern void LedDCFStatus( int status );
-extern void clearRing( byte ringNum );
+extern void clearRing( uint8_t ringNum );
 
 
 void copyBuffer();
 void decodeBufferContents( void );
 void finalizeBufferTask( void *param=NULL );
 void processDcfBit( int dcfBit );
-static int bitDecode( int bitStart, int bitEnd );
+static int bitDecode( int* buffer, int bitStart, int bitEnd );
 int calculateLeapYear( int year );
 int dayWeekNumber( int y, int m, int d, int w );
 
@@ -529,9 +529,9 @@ void finalizeBuffer( void ) {
 
 
 void copyBuffer() {
-   lastBufferPosition = bufferPosition;
-   lastDcfValidSignal = dcfValidSignal;
-  for( byte i=0;i<59;i++ ) {
+  lastBufferPosition = bufferPosition;
+  lastDcfValidSignal = dcfValidSignal;
+  for( uint8_t i=0;i<59;i++ ) {
     DCFbitFinalBuffer[i] = DCFbitBuffer[i]; // here, the received DCFbits are stored copyBuffer()
   }
 }
@@ -552,16 +552,16 @@ void copyBuffer() {
 
 void decodeBufferContents( void ) {
   // Buffer is full and ready to be decoded
-  dcfMinute  = bitDecode( 21, 27 );
-  dcfHour    = bitDecode( 29, 34 );
-  dcfDay     = bitDecode( 36, 41 );
-  dcfWeekDay = bitDecode( 42, 44 );
-  dcfMonth   = bitDecode( 45, 49 );
-  dcfYear    = bitDecode( 50, 57 );
+  dcfMinute  = bitDecode( DCFbitFinalBuffer, 21, 27 );
+  dcfHour    = bitDecode( DCFbitFinalBuffer, 29, 34 );
+  dcfDay     = bitDecode( DCFbitFinalBuffer, 36, 41 );
+  dcfWeekDay = bitDecode( DCFbitFinalBuffer, 42, 44 );
+  dcfMonth   = bitDecode( DCFbitFinalBuffer, 45, 49 );
+  dcfYear    = bitDecode( DCFbitFinalBuffer, 50, 57 );
   //call function to calculate day of year and weeknumber
   dayWeekNumber( dcfYear, dcfMonth, dcfDay, dcfWeekDay );
   // Get value of Summertime DCFbit. '1' = Summertime, '0' = wintertime
-  dcfDST     = bitDecode( 17, 17 );
+  dcfDST     = bitDecode( DCFbitFinalBuffer, 17, 17 );
   // determine Leap Year
   leapYear   = calculateLeapYear( dcfYear );
   #ifdef DCF77_DO_WEATHER
@@ -569,13 +569,33 @@ void decodeBufferContents( void ) {
     if ( addToWeatherInfo( DCFbitFinalBuffer ) ) {
       mWeatherArea = getArea();
       mWeatherSection = getSection();
-      byte aInfo[WEATHER_INFO_SIZE];
-      if (GetWeatherInfo( aInfo ) ) { // Decrypt
+      uint8_t aInfo[3];
+      if (GetWeatherInfo( aInfo ) ) { // Decrypt+decompress
         //log_d( "Ciphered Weather Data: %s", mDcf.weatherData );
         meteodata = decToBinStr( aInfo );
         //showWeather();
+        if( AllCitiesForecast != nullptr ) {
+          int forecastMinute, forecastHour;
+          if( dcfMinute == 0 ) {
+            if( dcfHour == 0 ) {
+              forecastHour = 23;
+            } else {
+              forecastHour = dcfHour -1;
+            }
+            forecastMinute = 59;
+          } else {
+            forecastHour = dcfHour;
+            forecastMinute = dcfMinute-1;
+          }
+          int forecastID = (((forecastHour) * 60) + (forecastMinute))  / 3; // zero indexed
+          setForecast( forecastID, forecastHour, forecastMinute, aInfo );
+        }
         weatherReady = true;
+      } else {
+        log_w("weather data couldn't be decrypted/uncompressed");
       }
+    } else {
+      log_w("weather data not complete yet");
     }
   #endif
 }
@@ -586,14 +606,14 @@ void decodeBufferContents( void ) {
 //
 // called from <processBuffer>
 //================================================================================================================
-static int bitDecode( int bitStart, int bitEnd )  {
+static int bitDecode( int* buffer, int bitStart, int bitEnd )  {
   // reset 'bitValue-array' counter
   int i = 0;
   int value = 0;
   // process bitrange bitStart > bitEnd
   while ( bitStart <= bitEnd ) {
     // check if DCFbit in buffer is '1', discard when '0'
-    if ( DCFbitFinalBuffer[bitStart] == 1 ) {
+    if ( buffer[bitStart] == 1 ) {
       // DCFbit in buffer == 1 so append its corresponding value to the variable 'value'
       value = value + bitValue[i];
     }

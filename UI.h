@@ -1,8 +1,98 @@
 #ifndef _UI_H_
 #define _UI_H_
 
-#include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
-#define tft M5.Lcd // syntax sugar
+
+#define LGFX_ONLY
+
+#ifndef LGFX_ONLY
+
+  // using ESP32-Chimera-Core device list
+
+  #include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
+  #define tft M5.Lcd // syntax sugar
+
+  void M5Begin()
+  {
+    if( SERIAL_SPEED != 115200 ) {
+      M5.begin(true, SD_ENABLE, false);
+      Serial.begin( SERIAL_SPEED );
+    } else {
+      M5.begin();
+    }
+  }
+
+
+#else
+
+  // using LovyanGFX device detection
+
+  #define LGFX_AUTODETECT
+  #include <LGFX_TFT_eSPI.h>
+  #include <Wire.h>
+
+  // Custom SD config
+  #include <SD.h>           // or SD_MMC.h, SPIFFS.h, LittleFS.h
+  #define M5STACK_SD SD     // or SD_MMC,   SPIFFS,   LittleFS
+  #define USE_TFCARD_CS_PIN // comment in/out if necessary
+  #define TFCARD_CS_PIN 13  // edit if necessary
+
+  // custom TFT config
+  struct LGFX_Config
+  {
+    // values picked from /LovyanGFX/src/config/
+    static constexpr spi_host_device_t spi_host = VSPI_HOST;
+    static constexpr int dma_channel = 1;
+    static constexpr int spi_mosi = 23;
+    static constexpr int spi_miso = -1;
+    static constexpr int spi_sclk =  5;
+  };
+  static lgfx::Panel_ST7735S panel; // panel name picked from /LovyanGFX/src/lgfx/panel/
+  static lgfx::LGFX_SPI<LGFX_Config> tft;
+
+  void M5Begin()
+  {
+    Serial.begin( SERIAL_SPEED );
+    Serial.printf("Custom ESP32 started at %d bauds!", SERIAL_SPEED);
+
+    // custom TFT pinout
+    // Panel_TTGO_TS panel, pinout picked from /LovyanGFX/src/lgfx/panel/
+    panel.freq_write = 20000000;
+    panel.panel_width  = 128;
+    panel.panel_height = 160;
+    panel.offset_x     = 2;
+    panel.offset_y     = 1;
+    panel.offset_rotation = 2;
+    panel.rgb_order = true;
+    panel.spi_3wire = true;
+    panel.spi_cs    = 16;
+    panel.spi_dc    = 17;
+    panel.gpio_rst  = 9;
+    panel.gpio_bl   = 27;
+    panel.pwm_ch_bl = 7;
+    tft.setPanel(&panel);
+    tft.init();
+
+    #if defined ( USE_TFCARD_CS_PIN ) && defined( TFCARD_CS_PIN )
+
+      log_d("Enabling SD from TFCARD_CS_PIN");
+
+      M5STACK_SD.end();
+      SPI.end();
+      SPI.begin();
+      M5STACK_SD.begin(TFCARD_CS_PIN, SPI, 20000000);
+
+      if ( lgfx::LGFX_Config::spi_host == HSPI_HOST ) {
+        tft.setSPIShared(false);
+      }
+    #else
+      log_d("Enabling SD_MMC");
+      M5STACK_SD.begin();
+      tft.setSPIShared(false);
+    #endif
+
+  }
+
+#endif
 
 #include "Config.h"
 #include "SpriteSheet.h"
@@ -40,7 +130,8 @@ static xSemaphoreHandle mux = NULL; // this is needed to prevent rendering colli
 
 
 // this is just lgfx::TextStyle with a constructor
-struct TextStyle {
+struct TextStyle
+{
   std::uint32_t fore_rgb888 = 0xFFFFFFU;
   std::uint32_t back_rgb888 = 0;
   float size_x = 1;
@@ -53,7 +144,8 @@ struct TextStyle {
     fore_rgb888( _fore_rgb888 ), back_rgb888( _back_rgb888 ), size_x( _size_x ), size_y( _size_y ), datum( _datum ), utf8( _utf8 ), cp437( _cp437 ) { }
 };
 
-struct FontStyle {
+struct FontStyle
+{
   const lgfx::IFont* font;
   TextStyle *style;
   // constructor
@@ -65,7 +157,8 @@ struct FontStyle {
 };
 
 
-struct BoxStyle {
+struct BoxStyle
+{
   const std::uint32_t fillColor;
   FontStyle* style;
   BoxStyle( const std::uint32_t  f, FontStyle *s ) : fillColor(f), style(s) { }
@@ -73,7 +166,8 @@ struct BoxStyle {
 
 
 // helper for setFontStyle
-void setTextStyle( TFT_eSprite *sprite, TextStyle *style ) {
+void setTextStyle( TFT_eSprite *sprite, TextStyle *style )
+{
   lgfx::TextStyle myStyle; // why no constructor ??
   myStyle.fore_rgb888 = style->fore_rgb888;
   myStyle.back_rgb888 = style->back_rgb888;
@@ -85,7 +179,8 @@ void setTextStyle( TFT_eSprite *sprite, TextStyle *style ) {
   sprite->setTextStyle( myStyle );
 }
 
-void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle ) {
+void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle )
+{
   sprite->setFont( myFontStyle->font );
   setTextStyle( sprite, myFontStyle->style );
 }
@@ -150,7 +245,8 @@ float r2 = float_r2; // outer ring
 float r3 = float_r3; // inner 10's mark
 float r4 = float_r4; // inner 10's label
 
-enum UIModes {
+enum UIModes
+{
   DCF_CLOCK, // default
   #ifdef DCF77_DO_WEATHER
   DCF_SETUP,
@@ -177,12 +273,15 @@ UIModes UIMode = DCF_CLOCK;
 //void sprite_drawJpg( TFT_eSprite *spr, int16_t x, int16_t y, const uint8_t * jpg_data, size_t jpg_len, uint16_t maxWidth, uint16_t maxHeight );
 
 
-void tft_drawSpriteSheet( SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 ) {
+void tft_drawSpriteSheet( SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 )
+{
   uint16_t offsetx = (icon%16)*32;
   uint16_t offsety = (icon/16)*32;
   tft.drawJpg( sprite_jpg, sprite_jpg_len, x, y, 32, 32, offsetx, offsety );
 }
-void sprite_drawSpriteSheet( TFT_eSprite &sprite, SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 ) {
+
+void sprite_drawSpriteSheet( TFT_eSprite &sprite, SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 )
+{
   uint16_t offsetx = (icon%16)*32;
   uint16_t offsety = (icon/16)*32;
   //log_e("sprite.drawSpriteSheet( %d, %d, %d, %d, %d, %d );", x, y, 32, 32, offsetx, offsety );
@@ -191,7 +290,8 @@ void sprite_drawSpriteSheet( TFT_eSprite &sprite, SpriteSheetIcon icon, uint16_t
   //log_e("done");
 }
 
-static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w, uint16_t *h ) {
+static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w, uint16_t *h )
+{
   *w = sprite->textWidth( string );
   *h = sprite->fontHeight();
 }
@@ -203,7 +303,8 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
 
 #if defined( BUTTON_A_PIN ) &&  defined( BUTTON_B_PIN ) &&  defined( BUTTON_C_PIN )
 
-  void checkButtons() {
+  void checkButtons()
+  {
     //static byte longPushCounter = 0;
     M5.update();
     if ( longPushCounter >= 30 /*|| M5.BtnC.pressedFor( 1000 )*/ ) {
@@ -238,7 +339,7 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
       case DCF_CLOCK:
         if( M5.BtnC.isPressed() ) longPushCounter++;
         else longPushCounter = 0;
-        if ( M5.BtnA.wasPressed() ) ESP.restart();
+        if ( M5.BtnA.wasPressed() ) dumpWeather();
         if ( M5.BtnB.wasPressed() ) dcf77SoundSwitch = 1 - dcf77SoundSwitch;
       break;
       case COOK_TIMER:
@@ -258,7 +359,8 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
 
 #ifdef DCF77_DO_WEATHER
 
-  static void updateIcons( SpriteSheetIcon icon1, SpriteSheetIcon icon2, SpriteSheetIcon icon3 ) {
+  static void updateIcons( SpriteSheetIcon icon1, SpriteSheetIcon icon2, SpriteSheetIcon icon3 )
+  {
     needrendering = 0;
     uint16_t posx = ( TFT_HALFWIDTH - 32 / 2 );
     uint16_t posy = ( TFT_HALFHEIGHT - 32 / 2 );
@@ -266,20 +368,23 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
     if( icon1 != nullicon && icon1 != lasticon1 ) {
       lasticon1 = icon1;
       needrendering++;
-      drawIconTask( icon1, posx-32, posy );
       log_w("Icon1 will be rendererd with #%d", icon1 );
+      drawIconTask( icon1, posx-32, posy );
+      vTaskDelay(200);
     }
     if( icon2 != nullicon && icon2 != lasticon2 ) {
       lasticon2 = icon2;
       needrendering++;
-      drawIconTask( icon2, posx, posy );
       log_w("Icon2 will be rendererd with #%d", icon2 );
+      drawIconTask( icon2, posx, posy );
+      vTaskDelay(200);
     }
     if( icon3 != nullicon && icon3 != lasticon3 ) {
       lasticon3 = icon3;
       needrendering++;
-      drawIconTask( icon3, posx+32, posy );
       log_w("Icon3 will be rendererd with #%d", icon3 );
+      drawIconTask( icon3, posx+32, posy );
+      vTaskDelay(200);
     }
     if( needrendering > 0 ) {
       while( needrendering > 1 ) {
@@ -292,7 +397,8 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
   }
 
 
-  void setupScroll() {
+  void setupScroll()
+  {
 
     takeMuxSemaphore();
     ScrollSprite.createSprite( tft.width(), scrollHeight );
@@ -309,13 +415,15 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
     giveMuxSemaphore();
   }
 
-  void unsetupScroll() {
+  void unsetupScroll()
+  {
     MaskSprite.deleteSprite();
     ScrollSprite.deleteSprite();
   }
 
 
-  void initScroll( String text/*="                             Meteo is loading" */ ) {
+  void initScroll( String text/*="                             Meteo is loading" */ )
+  {
     scrollText = text;
     scrollPos = 0;
     //scrollFontSize = int_scrollFontSizeSmall;
@@ -342,7 +450,8 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
   }
 
 
-  void updateScroll( String text ) {
+  void updateScroll( String text )
+  {
     scrollText = text;
     scrollPos = 0;
     //scrollFontSize = int_scrollFontSize;
@@ -354,7 +463,8 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
   }
 
 
-  void handleScroll() {
+  void handleScroll()
+  {
     if ( scrollWidth <= 0 ) {
       Serial.println("Skipping zero width scroll");
       return;
@@ -398,7 +508,8 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
 
 
 
-void displayBufferPosition( int dcfBit ) {
+void displayBufferPosition( int dcfBit )
+{
   takeMuxSemaphore();
 
   setFontStyle( &sprite, LedDisplayFontStyle );
@@ -416,7 +527,8 @@ void displayBufferPosition( int dcfBit ) {
 }
 
 
-void LedDisplay( int addr, String leftOrRight, int value ) {
+void LedDisplay( int addr, String leftOrRight, int value )
+{
   int shift;
   ( leftOrRight == "L" ? shift = 4 : shift = 0 );
   //Now print the number digit by digit
@@ -465,7 +577,8 @@ void LedDisplay( int addr, String leftOrRight, int value ) {
 }
 
 
-void LedDCFStatus( int status ) {
+void LedDCFStatus( int status )
+{
   uint16_t color = TFT_GRAY;
   switch ( status ) {
     case 0:
@@ -488,7 +601,8 @@ void LedDCFStatus( int status ) {
 }
 
 
-void LedParityStatus( byte paritynum, int status ) {
+void LedParityStatus( byte paritynum, int status )
+{
   int xpos = 0;
   int ypos = ( tft.height() -  2 * LedParityStatusFontHeight ) - 2; // TODO: normalize this
   String out = " ";
@@ -525,7 +639,8 @@ void LedParityStatus( byte paritynum, int status ) {
 }
 
 
-void LedErrorStatus( byte lednum, int status ) {
+void LedErrorStatus( byte lednum, int status )
+{
   int xpos = 0;
   int ypos = 12;
   String out = "   ";
@@ -594,7 +709,8 @@ void LedErrorStatus( byte lednum, int status ) {
 
 static const char weekStr[] = "SMTWTFS";
 
-void drawWeekDays( int daynum ) {
+void drawWeekDays( int daynum )
+{
 
   int hpos = sprite.width();
   int vpos = sprite.height();
@@ -632,7 +748,8 @@ void drawWeekDays( int daynum ) {
 
 }
 
-void LedWeekStatus( int weekDay, int status ) {
+void LedWeekStatus( int weekDay, int status )
+{
   int xpos = tft.width() - ( weekDayNamesWidth + 1 );
   int ypos = ( tft.height() - (LedWeekStatusFontHeight) ) - 3;
   int weekDayBlockWidth = LedWeekStatusFontWidth + 2;
@@ -715,7 +832,8 @@ void LedWeekStatus( int weekDay, int status ) {
 }
 
 
-void setRingLed( byte ringNum, byte ledNum, bool enable, bool clear ) {
+void setRingLed( byte ringNum, byte ledNum, bool enable, bool clear )
+{
   //float i = ( float( ledNum - 60 / 2 ) / 60) * TWO_PI;
   float x1, y1;
   uint16_t fillcolor, shinecolor;
@@ -766,7 +884,8 @@ void setRingLed( byte ringNum, byte ledNum, bool enable, bool clear ) {
 }
 
 
-void setRingCoords() {
+void setRingCoords()
+{
   for ( uint8_t ledNum = 0; ledNum < 60; ledNum++ ) {
     float i = ( float( ledNum - 60 / 2 ) / 60 ) * TWO_PI;
     float x1, y1, x2, y2, x3, y3, x4, y4;
@@ -787,7 +906,8 @@ void setRingCoords() {
 }
 
 
-void drawRing() {
+void drawRing()
+{
   takeMuxSemaphore();
 
   setFontStyle( &sprite, RingLabelsFontStyle );
@@ -843,14 +963,16 @@ void drawRing() {
 
 
 /* probably unused but kept for semantics */
-void clearRing( byte ringNum ) {
+void clearRing( byte ringNum )
+{
   for ( uint8_t ledNum = 0; ledNum < 60; ledNum++ ) {
     setRingLed( ringNum, ledNum, false );
   }
 }
 
 
-void error( int errorLed ) {
+void error( int errorLed )
+{
   // no valid data
   dcfValidSignal = false;
   // turn 'dcfValidSignal = false on' and clear Led's/displays because of error condition
@@ -864,7 +986,8 @@ void error( int errorLed ) {
 }
 
 
-void displayRtcTime() {
+void displayRtcTime()
+{
   //byte fontAscent = 5;
   char timeStr[9];
   sprintf( timeStr, "%02d:%02d:%02d", hour(), minute(), second() );
@@ -876,7 +999,8 @@ void displayRtcTime() {
 }
 
 
-void displayRtcDate() {
+void displayRtcDate()
+{
   char dateStr[11];
   sprintf( dateStr, "%04d-%02d-%02d", year(), month(), day() );
   takeMuxSemaphore();
@@ -895,7 +1019,8 @@ void displayRtcDate() {
 
 
 #ifdef SPEAKER_PIN
-  void marioIntro() {
+  void marioIntro()
+  {
     //Mario main theme short intro
     uint16_t NOTE_C7 = 2093;
     uint16_t NOTE_E7 = 2637;
@@ -921,7 +1046,8 @@ void displayRtcDate() {
 #endif
 
 
-void scheduleBuzz( uint16_t note, int duration ) {
+void scheduleBuzz( uint16_t note, int duration )
+{
   #ifdef SPEAKER_PIN
     willBuzzNote = note;
     willBuzzDuration = duration;
@@ -932,10 +1058,11 @@ void scheduleBuzz( uint16_t note, int duration ) {
 #ifdef DCF77_DO_WEATHER
 
   char countryCityHolder[64];
-  int citiesLength = 0;
+  //int citiesLength = 0;
   int halfPage = 0;
 
-  void paginateCities() {
+  void paginateCities()
+  {
 
     if( entriesIndex < 0 ) {
       entriesIndex = citiesLength-1;
@@ -979,15 +1106,18 @@ void scheduleBuzz( uint16_t note, int duration ) {
   }
 
 
-  void LoadCountryPref( const countryBycode* country ) {
+  void LoadCountryPref( const countryBycode* country )
+  {
     watchedCountry = (countryBycode*)country;
   }
-  void LoadCityPref( const char* city ) {
+  void LoadCityPref( const char* city )
+  {
     watchedCity = (char*)city;
   }
 
 
-  void CountryCityWizard( unsigned long timeout ) {
+  void CountryCityWizard( unsigned long timeout )
+  {
     #ifndef USE_BUTTONS
       // TODO: handle serial input instead of blaming the lack of HID
       log_e("This feature requires buttons!");
@@ -1014,8 +1144,14 @@ void scheduleBuzz( uint16_t note, int duration ) {
     if(  preferredCountry != String( cities[entriesIndex].country.name )
       || preferredCity    != String( cities[entriesIndex].name ) ) {
       // save only if choice changed
-      log_w("Prefs have changed, saving!");
+      log_w("Prefs have changed, clearing/saving!");
+
+      prefs.begin("DCF77WData", false);
+      prefs.clear();
+      prefs.end();
+
       prefs.begin("DCF77Prefs", false);
+      prefs.clear();
       prefs.putString( "country", cities[entriesIndex].country.name );
       prefs.putString( "city", cities[entriesIndex].name );
       prefs.end();
@@ -1028,28 +1164,35 @@ void scheduleBuzz( uint16_t note, int duration ) {
   }
 
 
-  void InitPrefs() {
+  void InitPrefs()
+  {
+
     prefs.begin("DCF77Prefs", true);
     preferredCountry = prefs.getString("country");
     preferredCity    = prefs.getString("city");
     prefs.end();
 
-    citiesLength = ( sizeof(cities) / sizeof(cityByCountry) ) -1;
+    //citiesLength = ( sizeof(cities) / sizeof(cityByCountry) ) -1;
 
     if( preferredCountry != "" ) {
       log_w("Found preferredCountry '%s' in NVS, will compare with local list", preferredCountry.c_str() );
       const countryBycode* country = findCountryByName( preferredCountry.c_str() );
+      const char* prefcity = preferredCity.c_str();
       if( country != nullptr ) {
         LoadCountryPref( country );
         if( preferredCity != "" ) {
-          log_w("Found preferredCity '%s' in NVS, will compare with local list", preferredCity.c_str() );
-          const char* city = findCityByName( preferredCity.c_str() );
-          if( city != nullptr ) {
-            LoadCityPref( city );
+          log_w("Found preferredCity '%s' in NVS, will compare with local list", prefcity );
+          int cityID = findCityIDByName( prefcity );
+          if( cityID > -1 ) {
+            LoadCityPref( prefcity );
             for( int i=0; i<citiesLength; i++ ) {
-              if( strcmp( city, cities[i].name )==0 && strcmp( country->name, cities[i].country.name )==0 ) {
+              if( strcmp( prefcity, cities[i].name )==0 && strcmp( country->name, cities[i].country.name )==0 ) {
                 entriesIndex = i;
                 CountryCityWizard( 5000 );
+                log_w("Free heap before weather data memory allocation: %d", ESP.getFreeHeap() );
+                initWeatherForecastCache();
+                initMyCityForecastsCache();
+                log_w("Free heap after weather data memory allocation: %d", ESP.getFreeHeap() );
                 return;
               }
             }
@@ -1058,11 +1201,18 @@ void scheduleBuzz( uint16_t note, int duration ) {
       } // else invalid country or end of array
     } // else empty country name returned from prefs
     CountryCityWizard( 600000 );
+
+    log_w("Free heap before weather data memory allocation: %d", ESP.getFreeHeap() );
+    initWeatherForecastCache();
+    initMyCityForecastsCache();
+    log_w("Free heap after weather data memory allocation: %d", ESP.getFreeHeap() );
+
   }
 #endif
 
 
-void InitPins() {
+void InitPins()
+{
   // initialize PIN connections
   pinMode( DCF77PIN,           INPUT );
   #ifdef DCF77_pdnPort
@@ -1076,7 +1226,8 @@ void InitPins() {
 }
 
 
-void initSpeaker() {
+void initSpeaker()
+{
   #ifdef SPEAKER_PIN
     // TONE
     Speaker.begin();
@@ -1086,7 +1237,8 @@ void initSpeaker() {
 }
 
 
-void initRTC() {
+void initRTC()
+{
   #ifdef USE_RTC
     Wire.begin( DS1307_SDA, DS1307_SCL );
     #ifdef _CHIMERA_CORE_
@@ -1114,7 +1266,8 @@ void initRTC() {
 }
 
 
-static void InitUI() {
+static void InitUI()
+{
   tft.clear();
   tft.setRotation( displayRotation );
   tft.fillScreen( TFT_BLACKISH );
@@ -1123,14 +1276,14 @@ static void InitUI() {
   if( spritePtr == NULL ) {
     log_e("Unable to create spritePtr");
   } else {
-    log_n("Successfully created spritePtr");
+    log_d("Successfully created spritePtr");
   }
   sprite.fillSprite( TFT_BLACK );
   uint16_t* logoSpritePtr = (uint16_t*)LogoSprite.createSprite( 32, 32 );
   if( logoSpritePtr == NULL ) {
     log_e("Unable to create logoSpritePtr");
   } else {
-    log_n("Successfully created logoSpritePtr");
+    log_d("Successfully created logoSpritePtr");
   }
 
   TFT_HALFWIDTH = tft.width() / 2;
@@ -1203,10 +1356,11 @@ static void InitUI() {
 }
 
 
-void displayData( void ) {
+void displayData( void )
+{
   if( dcfWeekDay + weekNumber + dcfDay + dcfMonth + dcfYear + dcfDST + leapYear == 0 ) {
     // uh-oh
-    log_e("Cowardly refusing to work with an empty data load (also zero is evil)");
+    log_e("Cowardly refusing to render with an empty data load (also zero is evil)");
     return;
   }
   // display Day of Week
@@ -1234,11 +1388,23 @@ void displayData( void ) {
     LedWeekStatus( LED_LEAPYEAR, LOW );
   }
   LedWeekStatus( LED_WEEKNUMBER, weekNumber );
-  Serial.printf( "dcfWeekDay: %d, weekNumber: %d, dcfDay: %d, dcfMonth: %d, dcfYear: %d, dcfDST: %d, leapYear: %d\n", dcfWeekDay, weekNumber, dcfDay, dcfMonth, dcfYear, dcfDST, leapYear );
+  Serial.printf( "DCF77 Timestamp : [20%02d-%02d-%02d %02d:%02d:%02d], DST: %d, leap: %d, weekDay: %d, weekNum: %d\n",
+    dcfYear,
+    dcfMonth,
+    dcfDay,
+    dcfHour,
+    dcfMinute,
+    0,
+    dcfDST,
+    leapYear,
+    dcfWeekDay,
+    weekNumber
+  );
 }
 
 
-void LedTest() {
+void LedTest()
+{
   // The displays are lit up sequentially because of the current draw.
   // When all is lit up at the same time, you would need a bigger power supply.
 
@@ -1280,8 +1446,17 @@ void LedTest() {
 }
 
 
-void initialize(void) {
-  M5.begin();
+void initialize(void)
+{
+  /*
+  if( SERIAL_SPEED != 115200 ) {
+    M5.begin(true, SD_ENABLE, false);
+    Serial.begin( SERIAL_SPEED );
+  } else {
+    M5.begin();
+  }*/
+  M5Begin();
+  Serial.printf("Started serial at %d bauds\n", SERIAL_SPEED);
 
   InitPins();
   InitUI();

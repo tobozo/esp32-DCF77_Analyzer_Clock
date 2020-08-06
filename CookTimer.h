@@ -149,9 +149,13 @@ void drawTimer( uint16_t posx, uint16_t posy ) {
 
 
 void timerSound() {
+  #ifdef SPEAKER_PIN
   for(uint16_t i=100;i<5000;i+=2) {
-    M5.Speaker.tone(5000-i, 50);
+    Speaker.tone(5000-i, 50);
   }
+  #else
+    // TODO visual alert
+  #endif
 }
 
 void cookTimerStop() {
@@ -274,10 +278,14 @@ void cookTimerloop() {
             drawTimer( sprite.width()/2, RTCDateYPos );
 
             do {
-              for(uint16_t i=100;i<5000;i+=4) {
-                M5.Speaker.tone(i, 30);
-                vTaskDelay(1);
-              }
+              #ifdef SPEAKER_PIN
+                for(uint16_t i=100;i<5000;i+=4) {
+                  Speaker.tone(i, 30);
+                  vTaskDelay(1);
+                }
+              #else
+                // TODO: visual alert
+              #endif
               delay(500);
               //showClock();
             } while(CookTimerButtonPos == BUTTON_NEUTRAL);

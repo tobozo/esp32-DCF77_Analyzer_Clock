@@ -1,21 +1,26 @@
-
 // code inspired by https://github.com/FroggySoft/AlarmClock and http://arduino-projects4u.com/home-weather-station/
 
 #define WEATHER_SIZE      82
 #define WEATHER_INFO_SIZE  3
 
-// from UI.h
-extern void updateScroll( String text );
 
-int fourdayforecast = 0;
-int twodayforecast = 0;
 int significantweather[60] = {0};
 String weathermemory[60];
-int mWeatherData[WEATHER_SIZE];
-byte mWeatherArea;
-byte mWeatherSection;
-extern int dcfDST, dcfMinute, dcfHour;
+int mWeatherData[WEATHER_SIZE+1];
+uint8_t mWeatherArea;
+uint8_t mWeatherSection;
 
+
+String decToBinStr( uint8_t aInfo[3] );
+int binStrToDec( String input );
+
+// outside this scope
+extern int dcfDST, dcfMinute, dcfHour;
+static void updateScroll( String text );
+static void updateIcons( SpriteSheetIcon icon1, SpriteSheetIcon icon2, SpriteSheetIcon icon3 );
+static bool weatherReady = false;
+
+// for serial output
 char degreeSign[] = {
   /* ° */
   0xC2,  0xB0,  0
@@ -25,15 +30,19 @@ char clockSign[] = {
   0xE2,  0x8F,  0xB0,  0
 };
 
+
 typedef struct {
   const char* code;
   const char* name;
 } countryBycode;
 
 bool operator==(const countryBycode& lhs, const countryBycode& rhs) {
+  if( lhs.code == nullptr || rhs.code == nullptr ) return false;
   return strcmp(lhs.code, rhs.code)==0 && strcmp(lhs.name, rhs.name)==0;/* your comparison code goes here */
 }
-bool operator==(const countryBycode& lhs, countryBycode* rhs) {
+bool operator==(const countryBycode lhs, countryBycode* rhs) {
+  if( lhs.code == nullptr || rhs->code == nullptr ) return false;
+  if( lhs.name == nullptr || rhs->name == nullptr ) return false;
   return strcmp(lhs.code, rhs->code)==0 && strcmp(lhs.name, rhs->name)==0;/* your comparison code goes here */
 }
 
@@ -47,27 +56,33 @@ typedef struct {
   SpriteSheetIcon icon;
 } iconByLabel;
 
+const countryBycode nullCity     = {nullptr, nullptr};
+const countryBycode France       = {"F",   "France"};
+const countryBycode Belgium      = {"B",   "Belgium"};
+const countryBycode Switzerland  = {"CH",  "Switzerland"};
+const countryBycode Germany      = {"D",   "Germany"};
+const countryBycode GreatBritain = {"GB",  "Great Britain"};
+const countryBycode Denmark      = {"DK",  "Denmark"};
+const countryBycode Italy        = {"I",   "Italy"};
+const countryBycode Netherlands  = {"NL",  "Netherlands"};
+const countryBycode Austria      = {"A",   "Austria"};
+const countryBycode Slovakia     = {"SK",  "Slovakia"};
+const countryBycode Czechia      = {"CZ",  "Czechia"};
+const countryBycode Sweden       = {"S",   "Sweden"};
+const countryBycode Norway       = {"N",   "Norway"};
+const countryBycode Hungary      = {"H",   "Hungary"};
+const countryBycode Spain        = {"E",   "Spain"};
+const countryBycode Andorra      = {"AND", "Andorra"};
+const countryBycode Portugal     = {"P",   "Portugal"};
+const countryBycode Ireland      = {"IRL", "Ireland"};
+const countryBycode Poland       = {"PL",  "Poland"};
+const countryBycode Croatia      = {"HR",  "Croatia"};
 
-countryBycode France       = {"F",   "France"};
-countryBycode Belgium      = {"B",   "Belgium"};
-countryBycode Switzerland  = {"CH",  "Switzerland"};
-countryBycode Germany      = {"D",   "Germany"};
-countryBycode GreatBritain = {"GB",  "Great Britain"};
-countryBycode Denmark      = {"DK",  "Denmark"};
-countryBycode Italy        = {"I",   "Italy"};
-countryBycode Netherlands  = {"NL",  "Netherlands"};
-countryBycode Austria      = {"A",   "Austria"};
-countryBycode Slovakia     = {"SK",  "Slovakia"};
-countryBycode Czechia      = {"CZ",  "Czechia"};
-countryBycode Sweden       = {"S",   "Sweden"};
-countryBycode Norway       = {"N",   "Norway"};
-countryBycode Hungary      = {"H",   "Hungary"};
-countryBycode Spain        = {"E",   "Spain"};
-countryBycode Andorra      = {"AND", "Andorra"};
-countryBycode Portugal     = {"P",   "Portugal"};
-countryBycode Ireland      = {"IRL", "Ireland"};
-countryBycode Poland       = {"PL",  "Poland"};
-countryBycode Croatia      = {"HR",  "Croatia"};
+// for convenience
+const countryBycode countries[20] = {
+  France, Belgium, Switzerland, Germany, GreatBritain, Denmark, Italy, Netherlands, Austria, Slovakia, Czechia,
+  Sweden, Norway, Hungary, Spain, Andorra, Portugal, Ireland, Poland, Croatia
+};
 
 static countryBycode *watchedCountry = nullptr;
 static char *watchedCity = nullptr;
@@ -82,12 +97,14 @@ const cityByCountry cities[] = {
   {Czechia, "Praha"}, {Czechia, "Decin"}, {Germany, "Berlin"}, {Sweden, "Gothenburg"}, {Sweden, "Stockholm"}, {Sweden, "Kalmar"}, {Sweden, "Joenkoeping"}, {Germany, "Donaueschingen"}, {Norway, "Oslo"}, {Germany, "Stuttgart"},
   {Italy, "Napoli"}, {Italy, "Ancona"}, {Italy, "Bari"}, {Hungary, "Budapest"}, {Spain, "Madrid"}, {Spain, "Bilbao"}, {Italy, "Palermo"}, {Spain, "Palma de Mallorca"}, {Spain, "Valencia"}, {Spain, "Barcelona"}, {Andorra, "Andorra"},
   {Spain, "Sevilla"}, {Portugal, "Lissabon"}, {Italy, "Sassari"}, {Spain, "Gijon"}, {Ireland, "Galway"}, {Ireland, "Dublin"}, {GreatBritain, "Glasgow"}, {Norway, "Stavanger"}, {Norway, "Trondheim"}, {Sweden, "Sundsvall"}, {Poland, "Gdansk"},
-  {Poland, "Warszawa"}, {Poland, "Krakow"}, {Sweden, "Umea"}, {Sweden, "Oestersund"}, {Switzerland, "Samedan"}, {Croatia, "Zagreb"}, {Switzerland, "Zermatt"}, {Croatia, "Split"}, {nullptr, nullptr}
+  {Poland, "Warszawa"}, {Poland, "Krakow"}, {Sweden, "Umea"}, {Sweden, "Oestersund"}, {Switzerland, "Samedan"}, {Croatia, "Zagreb"}, {Switzerland, "Zermatt"}, {Croatia, "Split"}, nullCity
 };
+
+//static const citiesLength = (sizeof(cities)/sizeof(cityByCountry)) -1;
+static const int citiesLength = 90;
 
 
 const countryBycode *findCountryByName( const char* countryName ) {
-  int citiesLength = (sizeof(cities)/sizeof(cityByCountry)) -1;
   for( int i=0; i< citiesLength; i++ ) {
     if( strcmp( cities[i].country.name, countryName ) == 0 ) {
       return &cities[i].country;
@@ -96,14 +113,24 @@ const countryBycode *findCountryByName( const char* countryName ) {
   return nullptr;
 }
 
-const char *findCityByName( const char* cityName ) {
-  int citiesLength = (sizeof(cities)/sizeof(cityByCountry)) -1;
+int findCityIndexByCityId( int cityID ) {
+  for( int i=0;i< citiesLength; i++ ) {
+    if( cities[i].name == nullptr ) break;
+  }
+}
+
+int findCityIDByName( const char* cityName ) {
+  //int citiesLength = (sizeof(cities)/sizeof(cityByCountry)) -1;
+  if( cityName==nullptr || cityName[0] == '\0' ) return -1;
+  //log_w("searching for city: %s", cityName);
   for( int i=0; i< citiesLength; i++ ) {
+    if( cities[i].name == nullptr ) break;
     if( strcmp( cities[i].name, cityName ) == 0 ) {
-      return cityName;
+
+      return i;
     }
   }
-  return nullptr;
+  return -1;
 }
 
 
@@ -205,32 +232,659 @@ iconByLabel anomaly2[] {
 String meteodata;
 
 
+
+void setTmpForecast( int forecastID );
+
+
+struct SignificantWeatherData {
+  int xwh = -1;  // Extremeweather
+  int anm1 = -1; // Weather anomality 1
+  int anm2 = -1; // Weather anomality 2
+  int wdir = -1; // wind direction
+  int wstr = -1; // wind strength
+  void setWeather( int _xwh, int _anm1, int _anm2 ) {
+    xwh  = _xwh;
+    anm1 = _anm1;
+    anm2 = _anm2;
+  }
+  void setWind( int _wdir, int _wstr ) {
+    wdir = _wdir;
+    wstr = _wstr;
+  }
+};
+
+static SignificantWeatherData** SignificantWeatherDataByCity = nullptr;
+
+
+void setWeather( int cityID, int _xwh, int _anm1, int _anm2 ) {
+  if( cityID < 0 || cityID > 90 ) {
+    log_e("Invalid city ID : %d", cityID ); return;
+  }
+  if( SignificantWeatherDataByCity == nullptr || SignificantWeatherDataByCity[cityID] == nullptr ) {
+    log_e("Premature call for city ID %d", cityID );
+  }
+  SignificantWeatherDataByCity[cityID]->setWeather( _xwh, _anm1, _anm2 );
+}
+
+void setWind( int cityID, int _wdir, int _wstr ) {
+  if( cityID < 0 || cityID > 90 ) {
+    log_e("Invalid city ID : %d", cityID ); return;
+  }
+  if( SignificantWeatherDataByCity == nullptr || SignificantWeatherDataByCity[cityID] == nullptr ) {
+    log_e("Premature call for city ID %d", cityID );
+  }
+  SignificantWeatherDataByCity[cityID]->setWind( _wdir, _wstr );
+}
+
+
+
+int16_t *PrefsCache = new int16_t[480*3];
+
+
+
+
+struct WeatherForecast {
+
+  int hour=-1, minute=-1, forecastID=-1;
+  uint8_t data[3] = {0,0,0};
+
+  // save to ram
+  void set( int _forecastID, int _hour, int _minute, uint8_t _data[3] ) {
+    hour       = _hour;
+    minute     = _minute;
+    forecastID = _forecastID;
+    // store in current object
+    memcpy( data, _data, 3);
+    // also copy to prefs cache
+    PrefsCache[forecastID*3]    = data[0];
+    PrefsCache[forecastID*3 +1] = data[1];
+    PrefsCache[forecastID*3 +2] = data[2];
+
+    setTmpForecast( forecastID );
+
+    log_w("Saved 3 bytes in weather cache {%d,%d,%d} for forecast #%d [%02d:%02d]", data[0], data[1], data[2], forecastID, hour, minute );
+
+  }
+
+  // load from sram
+  bool load( int _forecastID ) {
+    forecastID = _forecastID;
+    bool ret = false;
+
+    if( PrefsCache[forecastID*3] > -1 ) {
+      data[0] = PrefsCache[forecastID*3];
+      data[1] = PrefsCache[forecastID*3 +1];
+      data[2] = PrefsCache[forecastID*3 +2];
+      // pref exists, speculate hour/minute from that
+      hour   = forecastID / 20;
+      minute = (((forecastID)%20)*3)+2;
+      ret = true;
+      log_w("Thawed 3 {%d,%d,%d} bytes from NVS for forecast #%d with key '%s' [%02d:%02d]", data[0], data[1], data[2], forecastID, String(forecastID).c_str(), hour, minute );
+    } else {
+      // this sketch has never run more than 24h
+    }
+    return ret;
+
+  }
+};
+
+WeatherForecast** AllCitiesForecast = nullptr;
+
+
+void setForecast( int forecastID, int forecastHour, int forecastMinute, uint8_t aInfo[3] ) {
+  if( AllCitiesForecast == nullptr ) {
+    log_e("Premature requests ignored for forecastID #%d", forecastID);
+    return;
+  }
+  if( forecastID > 480 || forecastID < 0 ) {
+    log_e("Invalid forecastID : %d", forecastID);
+    return;
+  }
+  AllCitiesForecast[forecastID]->set( forecastID, forecastHour, forecastMinute, aInfo );
+}
+
+
 /*
-countryBycode countries[] = {
-  France, Belgium, Switzerland, Germany, GreatBritain, Denmark, Italy, Netherlands, Austria, Slovakia, Czechia,
-  Sweden, Norway, Hungary, Spain, Andorra, Portugal, Ireland, Poland, Croatia
-};*/
+  0110 Day critical weather
+      0001 Night critical weather
+          0001 Extreme weather
+              011 Rain prob.
+                  0 Anomaly
+                  101101 Temp
+*/
+#define CRLF    "\n"
+#define TIM_TPL "Weather data at %02dh%02dm:"    CRLF
+#define AR1_TPL "Area: %s"  CRLF
+#define AR2_TPL "Area1: %s" CRLF "Area2: %s"     CRLF
+#define DCW_TPL "%4s Day critical weather"       CRLF
+#define NCW_TPL "    %4s Night critical weather" CRLF
+#define XWH_TPL "        %4s Extreme weather"    CRLF
+#define RPB_TPL "            %3s Rain prob."     CRLF
+#define ANM_TPL "               %s Anomaly"      CRLF
+#define TEM_TPL "                %6s Temp."      CRLF
+
+#define WeatherDataTpl1 CRLF TIM_TPL AR1_TPL DCW_TPL NCW_TPL XWH_TPL RPB_TPL ANM_TPL TEM_TPL
+#define WeatherDataTpl2 CRLF TIM_TPL AR2_TPL DCW_TPL NCW_TPL XWH_TPL RPB_TPL ANM_TPL TEM_TPL
+//#define WeatherDataTpl "\n%4s Day critical weather\n    %4s Night critical weather\n        %4s Extreme weather\n            %3s Rain prob.\n               %s Anomaly\n                %6s Temp.\n"
+char *WeatherDataStr = new char[512];// = {0};
+
+struct WeatherData {
+
+  int hour, minute;
+  //int minuteOfDay;
+
+  int dcw;  // Day weather
+  int ncw;  // Night weather
+
+  int xwh;  // Extremeweather
+  int anm1; // Weather anomality 1
+  int anm2; // Weather anomality 2
+
+  int rpb;  // Rainprobability
+  int anm;  // Anomaly
+  int tem;  // Temperature
+  //int twodayforecast; // city index
+  //int fourdayforecast; // city index
+  uint8_t city4DayIndex = 255;
+  uint8_t city2Dayindex = 255;
+  bool is4dayforecast = false;
+
+  void set( WeatherForecast *fcast, bool debugEveryCity=false ) {
+    reset();
+    bool debugToSerial = debugEveryCity; // default
+    hour   = fcast->hour;
+    minute = fcast->minute;
+    WeatherDataStr[0] = '\0';
+
+    String wData = decToBinStr( fcast->data );
+    dcw  = binStrToDec( wData.substring(0, 4) );   // Day critical weather
+    ncw  = binStrToDec( wData.substring(4, 8) );   // Night critical weather
+    xwh  = binStrToDec( wData.substring(8, 12) );  // Weather anomalities combined
+    anm1 = binStrToDec( wData.substring(8, 10) );  // Weather anomality 1
+    anm2 = binStrToDec( wData.substring(10, 12) ); // Weather anomality 2
+    rpb  = binStrToDec( wData.substring(12, 15) ); // Rainprobability
+    anm  = binStrToDec( wData.substring(15, 16) ); // Anomaly
+    tem  = binStrToDec( wData.substring(16, 22) ); // Temperature
+
+    city4DayIndex = ((hour) % 3) * 20;
+    if (minute > 0) {
+      city4DayIndex += (minute - 1) / 3;
+    }
+
+    if (minute > 0) {
+      city2Dayindex = ((((hour) * 60) + (minute - 1)) % 90) / 3;
+    } else {
+      city2Dayindex = ((hour) * 60);
+    }
+    city2Dayindex += 60;
+
+    int city4ID = -1;
+    int city2ID = -1;
+
+    if( city2Dayindex <= 90 ) {
+      city2ID = findCityIDByName( cities[city2Dayindex].name );
+      if( !debugEveryCity && strcmp( cities[city2Dayindex].name, watchedCity ) == 0 ) {
+        debugToSerial = true;
+      }
+    } else {
+      log_e("********** bogus value for city2Dayindex %d at [%02d:%02d]", city2Dayindex, hour, minute );
+      return;
+    }
+    if( city4DayIndex <= 90 ) {
+      city4ID = findCityIDByName( cities[city4DayIndex].name );
+      if( !debugEveryCity && strcmp( cities[city4DayIndex].name, watchedCity ) == 0 ) {
+        debugToSerial = true;
+      }
+    } else {
+      log_e("********** bogus value for city4DayIndex %d at [%02d:%02d]", city4DayIndex, hour, minute );
+      return;
+    }
+
+    if (hour < 21) {
+
+      if ((hour) % 6 < 3) {
+        // Extreme weather is valid from this hour but also +3 hour
+        // Cache the heavy weather data for this city
+        log_d("1: Will %s update weather info for cityID %d / %d / [%02d:%02d]", city4ID > -1 ? "":"NOT", city4ID, city4DayIndex, hour, minute);
+        setWeather( city4ID, xwh, anm1, anm2);
+      }
+      if ((hour) % 6 > 2) {
+        // Cache the wind data for this city
+        log_d("1: Will %s update wind info for cityID %d / %d / [%02d:%02d]", city4ID > -1 ? "":"NOT", city4ID, city4DayIndex, hour, minute);
+        setWind( city4ID, xwh, rpb );
+      }
+      is4dayforecast = true;
+    } else {
+      // Between 21:00-23:59 significant weather & temperature is for cities 60-89, wind and wind direction for cities 0-59.
+      // Cache the wind data for this city
+      //int cityID = city2ID;
+      log_d("2: Will %s update wind info for cityID %d / %d / [%02d:%02d]", city2ID > -1 ? "":"NOT", city2ID, city2Dayindex, hour, minute);
+      setWind( city2ID, xwh, rpb );
+      is4dayforecast = false;
+    }
+
+    if( debugToSerial ) {
+      if( is4dayforecast ) {
+        sprintf( WeatherDataStr, WeatherDataTpl1,
+          hour,
+          minute,
+          cities[city4DayIndex].name,
+          wData.substring(0, 4),   // Day critical weather
+          wData.substring(4, 8),   // Night critical weather
+          wData.substring(8, 12),  // Weather anomalities combined
+          wData.substring(12, 15), // Rainprobability
+          wData.substring(15, 16), // Anomaly
+          wData.substring(16, 22)  // Temperature
+        );
+      } else {
+        sprintf( WeatherDataStr, WeatherDataTpl2,
+          hour,
+          minute,
+          cities[city4DayIndex].name,
+          cities[city2Dayindex].name,
+          wData.substring(0, 4),   // Day critical weather
+          wData.substring(4, 8),   // Night critical weather
+          wData.substring(8, 12),  // Weather anomalities combined
+          wData.substring(12, 15), // Rainprobability
+          wData.substring(15, 16), // Anomaly
+          wData.substring(16, 22)  // Temperature
+        );
+      }
+      Serial.printf( "[%03d] %s", fcast->forecastID, WeatherDataStr );
+      render();
+    }
+
+  }
+
+
+  int                    AreaCountryID = -1;
+  const char*            AreaCountryName = nullptr;
+  const char*            AreaCityName = nullptr;
+  int                    AreaTimeSlice1 = -1;
+  const char*            AreaTime1Label = nullptr;
+  const char*            TimeSlice1WeatherPrefix = nullptr;
+  const char*            TimeSlice1WeatherLabel = nullptr;
+  const SpriteSheetIcon* TimeSlice1WeatherIcon = nullptr;
+  int                    AreaTimeSlice2 = -1;
+  const char*            AreaTime2Label = nullptr;
+  const char*            TimeSlice2WeatherPrefix = nullptr;
+  const char*            TimeSlice2WeatherLabel = nullptr;
+  const SpriteSheetIcon* TimeSlice2WeatherIcon = nullptr;
+  const char*            ExtremeweatherLabel = nullptr;
+  const SpriteSheetIcon* ExtremeweatherIcon = nullptr;
+  const char*            ExtremeweatherAnomaly1Label = nullptr;
+  const SpriteSheetIcon* ExtremeweatherAnomaly1Icon = nullptr;
+  const char*            ExtremeweatherAnomaly2Label = nullptr;
+  const SpriteSheetIcon* ExtremeweatherAnomaly2Icon = nullptr;
+  int                    RainprobabilityRawValue = -1;
+  const char*            Rainprobability = nullptr;
+  const char*            WinddirectionLabel = nullptr;
+  const SpriteSheetIcon* WinddirectionIcon = nullptr;
+  const char*            WindstrengthLabel = nullptr;
+  const SpriteSheetIcon* WindstrengthIcon = nullptr;
+  const char*            WeatherAnomality = nullptr;
+  const char*            Temperature = nullptr;
+  const char*            TemperatureTrend = nullptr;
+
+  void reset() {
+    AreaCountryID;
+    AreaCountryName = nullptr;
+    AreaCityName = nullptr;
+    AreaTimeSlice1 = -1;
+    AreaTime1Label = nullptr;
+    TimeSlice1WeatherPrefix = nullptr;
+    TimeSlice1WeatherLabel = nullptr;
+    TimeSlice1WeatherIcon = nullptr;
+    AreaTimeSlice2 = -1;
+    AreaTime2Label = nullptr;
+    TimeSlice2WeatherPrefix = nullptr;
+    TimeSlice2WeatherLabel = nullptr;
+    TimeSlice2WeatherIcon = nullptr;
+    ExtremeweatherLabel = nullptr;
+    ExtremeweatherIcon = nullptr;
+    ExtremeweatherAnomaly1Label = nullptr;
+    ExtremeweatherAnomaly1Icon = nullptr;
+    ExtremeweatherAnomaly2Label = nullptr;
+    ExtremeweatherAnomaly2Icon = nullptr;
+    RainprobabilityRawValue = -1;
+    Rainprobability = nullptr;
+    WinddirectionLabel = nullptr;
+    WinddirectionIcon = nullptr;
+    WindstrengthLabel = nullptr;
+    WindstrengthIcon = nullptr;
+    WeatherAnomality = nullptr;
+    Temperature = nullptr;
+    TemperatureTrend = nullptr;
+  }
+
+  void setAreaCountryName(const char* name) { AreaCountryName=name; };
+  void setAreaCityName(const char* name) { AreaCityName=name; };
+  void setAreaTimeSlice(int slicenum) { AreaTimeSlice1=slicenum; };
+  void setAreaTime1Label(const char* label) { AreaTime1Label=label; }
+  void setTimeSlice1WeatherPrefix(const char* prefix) { TimeSlice1WeatherPrefix=prefix; };
+  void setTimeSlice1WeatherLabel(const char* label) { TimeSlice1WeatherLabel=label; };
+  void setTimeSlice1WeatherIcon( const SpriteSheetIcon* icon ) { TimeSlice1WeatherIcon=icon; };
+  void setAreaTimeSlice2( int slicenum ) { AreaTimeSlice2=slicenum; };
+  void setAreaTime2Label(const char* label) { AreaTime2Label=label; }
+  void setTimeSlice2WeatherPrefix(const char* prefix) { TimeSlice2WeatherPrefix=prefix; };
+  void setTimeSlice2WeatherLabel(const char* label) { TimeSlice2WeatherLabel=label; };
+  void setTimeSlice2WeatherIcon( SpriteSheetIcon* icon ) { TimeSlice2WeatherIcon=icon; };
+  void setExtremeweatherLabel(const char* label) { ExtremeweatherLabel=label; };
+  void setExtremeweatherIcon( SpriteSheetIcon* icon )  { ExtremeweatherIcon=icon; };
+  void setExtremeweatherAnomaly1Label(const char* label) { ExtremeweatherAnomaly1Label=label; };
+  void setExtremeweatherAnomaly1Icon( SpriteSheetIcon* icon ) { ExtremeweatherAnomaly1Icon=icon; };
+  void setExtremeweatherAnomaly2Label(const char* label) { ExtremeweatherAnomaly2Label=label; };
+  void setExtremeweatherAnomaly2Icon( SpriteSheetIcon* icon ) { ExtremeweatherAnomaly2Icon=icon; };
+  void setRainprobability(const char* percentage) { Rainprobability=percentage; };
+  void setWinddirectionLabel(const char* label) { WinddirectionLabel=label; };
+  void setWinddirectionIcon( SpriteSheetIcon* icon ) { WinddirectionIcon=icon; };
+  void setWindstrengthLabel(const char* label) { WindstrengthLabel=label; };
+  void setWindstrengthIcon( SpriteSheetIcon* icon ) { WindstrengthIcon=icon; };
+  void setWeatherAnomality(const char* yesno) { WeatherAnomality=yesno; };
+  void setTemperature(const char* temperature) { Temperature=temperature; };
+  void setTemperatureTrend(const char* trend) { TemperatureTrend=trend; };
+
+  // const'ed for use in the Serial output and the TFT UI
+  const char* LABEL_EMPTY = "";
+  const char* LABEL_NIGHT = "Night";
+  const char* LABEL_DAY   = "Day";
+  const char* LABEL_HEAVY = "Heavy ";
+  const char* LABEL_CLEAR = "Clear";
+  const char* LABEL_YES   = "Yes";
+  const char* LABEL_NO    = "No";
+  const char* LABEL_21    = "<-21 ";
+  const char* LABEL_40    = ">40 ";
+  const char* LABEL_MIN   = "min";
+  const char* LABEL_MAX   = "max";
+
+  enum RenderPattern {
+    PATH_NONE,
+    PATH_1,
+    PATH_1_1,
+    PATH_1_1_1,
+    PATH_1_1_2,
+    PATH_1_2,
+    PATH_2,
+    PATH_3
+  };
+
+  RenderPattern pattern = PATH_NONE;
+
+  void renderSerial() {
+    switch( pattern ) {
+      case PATH_1: log_e("wtf"); break; // should never happen
+      case PATH_1_1:   break; // (hour%6<3): no extreme or significant weather
+      case PATH_1_1_1: break; // (hour%6<3): significant weather but no extreme
+      case PATH_1_1_2: break; // (hour%6<3): extreme weather
+      case PATH_1_2: break;   // (hour%6>2): extreme weather + wind strength/direction
+      case PATH_2: break;
+      case PATH_3: break;
+      case PATH_NONE: break;
+    }
+  }
+
+  void renderSprite() {
+
+  }
+
+
+  void render( bool do_sprite = true ) {
+
+    switch(tem) {
+      case 0:
+        setTemperature( LABEL_21 );
+      break;
+      case 63:
+        setTemperature( LABEL_40 );
+      break;
+      default:
+        setTemperature( String( tem - 22 ).c_str() );
+      break;
+    }
+    setTemperatureTrend( (((hour) % 6) > 2 && (hour < 21)) ? LABEL_MIN : LABEL_MAX );
+
+    if (hour < 21) {
+      // Between 00:00-20:59 weather data is for all cities
+      pattern = PATH_1;
+      int cityID = findCityIDByName( cities[city4DayIndex].name );
+      int significantWeather = SignificantWeatherDataByCity[cityID]->xwh;
+      setAreaCountryName( cities[city4DayIndex].country.name );
+      setAreaCityName( cities[city4DayIndex].name );
+      setAreaTimeSlice( int( (hour / 6) + 1 ) );
+      setAreaTime1Label( (((hour) % 6) > 2) ? LABEL_NIGHT : LABEL_DAY );
+      if( do_sprite ) setTimeSlice1WeatherIcon( &weather[dcw].icon );
+      if (dcw == 5 || dcw == 6 || dcw == 13 || dcw == 7) {
+        if (significantWeather == 1 || significantWeather == 2) {
+          setTimeSlice1WeatherPrefix( (dcw != 6) ? LABEL_HEAVY : LABEL_EMPTY );
+          setTimeSlice1WeatherLabel( weather[dcw].label );
+        } else {
+          setTimeSlice1WeatherLabel( weather[dcw].label );
+        }
+      } else {
+        setTimeSlice1WeatherLabel( weather[dcw].label );
+      }
+      setAreaTime2Label( LABEL_NIGHT );
+      if( do_sprite ) setTimeSlice2WeatherIcon( &weather[ncw].icon );
+      if (ncw == 5 || ncw == 6 || ncw == 13 || ncw == 7) {
+        if (significantWeather == 1 || significantWeather == 3) {
+          setTimeSlice2WeatherPrefix( (ncw != 6) ? LABEL_HEAVY : LABEL_EMPTY );
+          setTimeSlice2WeatherLabel( weather[ncw].label );
+        } else {
+          setTimeSlice2WeatherLabel( weather[ncw].label );
+        }
+      } else {
+        if (ncw == 1) {
+          setTimeSlice2WeatherLabel( LABEL_CLEAR );
+        } else {
+          setTimeSlice2WeatherLabel( weather[ncw].label );
+        }
+      }
+      if ((hour) % 6 < 3) {
+        pattern = PATH_1_1;
+        setRainprobability( rainprobability[rpb].label );
+        if (xwh == 0) { // DI=0 and WA =0
+          if( significantWeather > -1 ) {
+            pattern = PATH_1_1_1;
+            setExtremeweatherLabel( heavyweather[significantWeather].label );
+            if( do_sprite ) setExtremeweatherIcon( &heavyweather[significantWeather].icon );
+          }
+        } else {
+          pattern = PATH_1_1_2;
+          setExtremeweatherAnomaly1Label( anomaly1[anm1].label );
+          if( do_sprite ) setExtremeweatherAnomaly1Icon( &anomaly1[anm1].icon );
+          setExtremeweatherAnomaly2Label( anomaly2[anm2].label );
+          if( do_sprite ) setExtremeweatherAnomaly2Icon( &anomaly2[anm2].icon );
+        }
+      } else if ((hour) % 6 > 2) {
+        pattern = PATH_1_2;
+        if( do_sprite ) setWinddirectionIcon( &winddirection[xwh].icon );
+        setWinddirectionLabel( winddirection[xwh].label );
+        if( do_sprite ) setWindstrengthIcon( &windstrength[rpb].icon );
+        setWindstrengthLabel( windstrength[rpb].label );
+        if( do_sprite ) setExtremeweatherIcon( &heavyweather[significantWeather].icon );
+        setExtremeweatherLabel( heavyweather[significantWeather].label );
+      }
+      setWeatherAnomality( (anm == 1) ? LABEL_YES : LABEL_NO );
+
+      renderSerial();
+      if( do_sprite ) renderSprite();
+    } else {
+      // Between 21:00-23:59 significant weather & temperature is for cities 60-89, wind and wind direction for cities 0-59.
+      pattern = PATH_2;
+      /*Area1 Country name*/      cities[city4DayIndex].country.name;
+      /*Area1 City name*/         cities[city4DayIndex].name;
+      /*Area1 Time slice*/        (((hour) % 6) > 2) ? LABEL_NIGHT : LABEL_DAY, int((hour / 6) + 1);
+      /*Area1 Day weather*/       weather[dcw].label;
+      /*Area1 Night weather*/     ncw, (ncw == 1) ? LABEL_CLEAR : weather[ncw].label;
+      /*Area1 Weather Anomality*/ (anm == 1) ? LABEL_YES : LABEL_NO;
+      renderSerial();
+      if( do_sprite ) renderSprite();
+      pattern = PATH_3;
+      /*Area2 Country name*/      cities[city2Dayindex].country.name;
+      /*Area2 City name*/         cities[city2Dayindex].name;
+      /*Area2 Time slice*/        (((hour - 21) * 60 + minute) > 90) ? 2 : 1;
+      /*Area2 Winddirection*/     winddirection[xwh].label;
+      /*Area2 Winddirection Icon*/winddirection[xwh].icon;
+      /*Area2 Windstrength*/      windstrength[rpb].label;
+      renderSerial();
+
+    }
+
+  }
+
+};
+
+WeatherData tmpWeatherData;
+WeatherData** MyCityForecasts;
+
+void setTmpForecast( int forecastID ) {
+  if ( AllCitiesForecast == nullptr ) {
+    log_e("Premature call for id %d", forecastID );
+    return;
+  }
+  if( forecastID > 480 || forecastID < 0 ) {
+    log_e("Invalid id : %d", forecastID );
+    return;
+  }
+  tmpWeatherData.set( AllCitiesForecast[forecastID] );
+}
+
+void initMyCityForecastsCache() {
+
+  MyCityForecasts = (WeatherData**)calloc( 8, sizeof( WeatherData* ) );
+  for(int i=0;i<8;i++) {
+    MyCityForecasts[i] = (WeatherData*)calloc( 1, sizeof( WeatherData ) );
+    if( MyCityForecasts[i] == NULL ) {
+      log_e("Failed to alloc memory for city forecast slot %d", i);
+    }
+  }
+}
+
+
+void printPrefsCache() {
+  Serial.print("00h: ");
+  for( int i=0;i<480*3;i+=3 ) {
+    if(PrefsCache[i] != -1) {
+      Serial.print("+");
+    } else {
+      Serial.print(".");
+    }
+    if( i%60>56 ) {
+      Serial.println();
+      int t = (i/60)+1;
+      if( t < 24 ) {
+        Serial.printf("%02dh: ", (i/60)+1);
+      }
+    }
+  }
+}
+
+void printSignificantWeatherDataCache() {
+  log_w("SignificantWeatherDataCache");
+  for( int i=0; i< citiesLength; i++ ) {
+    if( SignificantWeatherDataByCity[i]->xwh != -1 || SignificantWeatherDataByCity[i]->wdir != -1 ) {
+      Serial.print("+");
+    } else {
+      Serial.print(".");
+    }
+  }
+  Serial.println();
+}
 
 
 
-void copyWeatherInfo( int* aMessage, byte aIndex ) {
-  byte j=aIndex;
-  for(byte i=0; i<14; i++) {
+// save to NVS
+static void saveWeatherCache() {
+  log_w("Saving weather prefs cache to NVS");
+  prefs.begin("DCF77WData", false);
+  prefs.putBytes( "cache", PrefsCache, 480*3*2 );
+  prefs.end();
+  printPrefsCache();
+}
+
+
+void dumpWeather() {
+  log_w("Will dump weather data for watched city");
+  for(int i=0;i<480;i++) {
+    if( AllCitiesForecast[i] == NULL || AllCitiesForecast[i]->hour == -1 ) continue;
+    setTmpForecast( i );
+  }
+}
+
+
+void initWeatherForecastCache() {
+
+  prefs.begin("DCF77WData", true);
+  int prefsCacheSize = prefs.getBytes( "cache", PrefsCache, 480*3*2 );
+  if( prefsCacheSize == 0 ) {
+    log_w("Initiating empty weather prefs cache");
+    for(int i=0;i<480*3;i++) {
+      PrefsCache[i] = -1;
+    }
+    saveWeatherCache();
+  } else {
+    log_w("Loaded %d bytes into weather prefs cache from NVS", prefsCacheSize);
+  }
+  prefs.end();
+
+  printPrefsCache();
+
+  SignificantWeatherDataByCity = (SignificantWeatherData**)calloc( citiesLength, sizeof( SignificantWeatherData* ) );
+  if( SignificantWeatherDataByCity == NULL ) {
+    log_e("Failed to alloc memory for significant weather data cache");
+  }
+  for( int i=0; i< citiesLength; i++ ) {
+    SignificantWeatherDataByCity[i] = new  SignificantWeatherData(); //(SignificantWeatherData*)calloc( 1, sizeof( SignificantWeatherData ) );
+    if( SignificantWeatherDataByCity[i] == NULL ) {
+      log_e("Failed to alloc memory for significant weather cache item #%d", i);
+    }
+  }
+
+  AllCitiesForecast = (WeatherForecast**)calloc( 480, sizeof( WeatherForecast* ) );
+  log_n("Init weather forecast cache");
+  for(int i=0;i<480;i++) {
+    AllCitiesForecast[i] = (WeatherForecast*)calloc( 1, sizeof( WeatherForecast ) );
+    if( AllCitiesForecast[i] == NULL ) {
+      log_e("Failed to alloc memory for slot %d", i);
+    } else {
+      if( AllCitiesForecast[i]->load( i ) ) {
+        log_w("Found cached data for forecast #%d [%02dh:%02dm]", i, AllCitiesForecast[i]->hour, AllCitiesForecast[i]->minute);
+        setTmpForecast( i );
+        //tmpWeatherData.set( AllCitiesForecast[i] );
+      } else {
+        //Serial.print(".");
+      }
+    }
+  }
+
+  printSignificantWeatherDataCache();
+
+}
+
+
+
+
+
+
+void copyWeatherInfo( int* aMessage, uint8_t aIndex ) {
+  uint8_t j=aIndex;
+  for(uint8_t i=0; i<14; i++) {
     mWeatherData[j++] = aMessage[i+1];
   }
 }
 
 bool addToWeatherInfo( int* aMessage ) {
   bool lCompleted = false;
-  byte j = 0;
+  uint8_t j = 0;
   if( aMessage[20]==1 ) {
-    byte minute = dcfMinute;
-    minute--;
-    byte part = minute % 3;
+    uint8_t _minute = dcfMinute;
+    if( _minute==0 ) _minute = 60; //
+    _minute--;
+    uint8_t part = _minute % 3;
     switch( part ) {
       case 0:  // first part
         // clear all old data
-        for( byte i=0; i<WEATHER_SIZE; i++ )
+        for( uint8_t i=0; i<WEATHER_SIZE; i++ )
           mWeatherData[i]=0;
         //copy received data into correct part
         copyWeatherInfo( aMessage,0 );
@@ -239,24 +893,24 @@ bool addToWeatherInfo( int* aMessage ) {
         copyWeatherInfo( aMessage,14 );
         j = 14+14+14;
         // add time info
-        for(byte i=21; i<28; i++)   // add minutes
+        for(uint8_t i=21; i<28; i++)   // add minutes
           mWeatherData[j++] = aMessage[i];
         j++;
-        for(byte i=29; i<35; i++)   // add hours
+        for(uint8_t i=29; i<35; i++)   // add hours
           mWeatherData[j++] = aMessage[i];
         j+=2;
-        for(byte i=36; i<42; i++)   // add day
+        for(uint8_t i=36; i<42; i++)   // add day
           mWeatherData[j++] = aMessage[i];
         j+=2;
-        for(byte i=45; i<50; i++)   // add month
+        for(uint8_t i=45; i<50; i++)   // add month
           mWeatherData[j++] = aMessage[i];
-        for(byte i=42; i<45; i++)   // add week day
+        for(uint8_t i=42; i<45; i++)   // add week day
           mWeatherData[j++] = aMessage[i];
-        for(byte i=50; i<58; i++)   // add year
+        for(uint8_t i=50; i<58; i++)   // add year
           mWeatherData[j++] = aMessage[i];
       break;
       case 2: // third part
-        copyWeatherInfo( aMessage,14+14 );
+        copyWeatherInfo( aMessage, 14+14 );
         lCompleted = true;
       break;
     }
@@ -265,12 +919,12 @@ bool addToWeatherInfo( int* aMessage ) {
 }
 
 
-byte GetWeatherArea() {
+uint8_t GetWeatherArea() {
   return mWeatherArea;
 }
 
 
-byte GetWeatherSection() {
+uint8_t GetWeatherSection() {
   return mWeatherSection;
 }
 
@@ -289,7 +943,7 @@ unsigned int getMinutesSince2200() {
 }
 
 
-byte getArea()  {
+uint8_t getArea()  {
   unsigned int minutes = getMinutesSince2200();
   // each block of data takes 3 minutes
   // in total 60 areas
@@ -300,7 +954,7 @@ byte getArea()  {
 }
 
 
-byte getSection() {
+uint8_t getSection() {
   unsigned int minutes = getMinutesSince2200();
   // each block of data takes 3 minutes
   // in total 60 areas
@@ -367,7 +1021,7 @@ const uint32_t mUintArrBitPattern30_1[] /*PROGMEM*/ = {
 /// <summary>
 /// bit pattern for 12-15 from 1A (time2)
 /// </summary>
-const byte mUintArrBitPattern30_2[] /*PROGMEM*/ = {
+const uint8_t mUintArrBitPattern30_2[] /*PROGMEM*/ = {
   0x00, //0b00000000,  // 17.1
   0x00, //0b00000000,  // 16.5
   0x00, //0b00000000,  // 19.1
@@ -434,7 +1088,7 @@ const uint32_t mUintArrBitPattern20[] /*PROGMEM*/ = {
 /// <summary>
 /// bit pattern for 12-15 from 16-19 (1/3)
 /// </summary>
- const byte mByteArrLookupTable1C_1[] /*PROGMEM*/ = {
+ const uint8_t mByteArrLookupTable1C_1[] /*PROGMEM*/ = {
   0xBB, 0x0E, 0x22, 0xC5, 0x73, 0xDF, 0xF7, 0x6D, 0x90, 0xE9, 0xA1, 0x38, 0x1C, 0x84, 0x4A, 0x56,
   0x64, 0x8D, 0x28, 0x0B, 0xD1, 0xBA, 0x93, 0x52, 0x1C, 0xC5, 0xA7, 0xF0, 0xE9, 0x7F, 0x36, 0x4E,
   0xC1, 0x77, 0x3D, 0xB3, 0xAA, 0xE0, 0x0C, 0x6F, 0x14, 0x88, 0xF6, 0x2B, 0xD2, 0x99, 0x5E, 0x45,
@@ -444,7 +1098,7 @@ const uint32_t mUintArrBitPattern20[] /*PROGMEM*/ = {
 /// <summary>
 /// bit pattern for 12-15 from 16-19 (2/3)
 /// </summary>
-const byte mByteArrLookupTable1C_2[] /*PROGMEM*/ = {
+const uint8_t mByteArrLookupTable1C_2[] /*PROGMEM*/ = {
   0xAB, 0x3D, 0xFC, 0x74, 0x65, 0xE6, 0x0E, 0x4F, 0x97, 0x11, 0xD8, 0x59, 0x83, 0xC2, 0xBA, 0x20,
   0xC5, 0x1B, 0xD2, 0x58, 0x49, 0x37, 0x01, 0x7D, 0x93, 0xFA, 0xE0, 0x2F, 0x66, 0xB4, 0xAC, 0x8E,
   0xB7, 0xCC, 0x43, 0xFF, 0x58, 0x66, 0xEB, 0x35, 0x82, 0x2A, 0x99, 0xDD, 0x00, 0x71, 0x14, 0xAE,
@@ -454,7 +1108,7 @@ const byte mByteArrLookupTable1C_2[] /*PROGMEM*/ = {
 /// <summary>
 /// bit pattern for 12-15 from 16-19 (3/3)
 /// </summary>
-const byte mByteArrLookupTable1C_3[] /*PROGMEM*/ = {
+const uint8_t mByteArrLookupTable1C_3[] /*PROGMEM*/ = {
   0x0A, 0x02, 0x00, 0x0F, 0x06, 0x07, 0x0D, 0x08, 0x03, 0x0C, 0x0B, 0x05, 0x09, 0x01, 0x04, 0x0E,
   0x02, 0x09, 0x05, 0x0D, 0x0C, 0x0E, 0x0F, 0x08, 0x06, 0x07, 0x0B, 0x01, 0x00, 0x0A, 0x04, 0x03,
   0x08, 0x00, 0x0D, 0x0F, 0x01, 0x0C, 0x03, 0x06, 0x0B, 0x04, 0x09, 0x05, 0x0A, 0x07, 0x02, 0x0E,
@@ -467,7 +1121,7 @@ const byte mByteArrLookupTable1C_3[] /*PROGMEM*/ = {
 #define Byte3  Bytes[3]
 
 union ByteUInt {
-  byte Bytes[4];
+  uint8_t Bytes[4];
   uint32_t  FullUint;
 };
 
@@ -477,14 +1131,14 @@ struct DataContainer {
   ByteUInt mByteUint2;  // Registers R08 to R0A
   ByteUInt mByteUint3;  // Registers R0B to R0E
   ByteUInt mByteUint4;  // Registers R1C to R1E
-  byte mByteUpperTime2; // mByteR1B;
+  uint8_t mByteUpperTime2; // mByteR1B;
   uint32_t mUintLowerTime;
 };
 
 
-byte flipByte(byte aByte) {
-  byte result = 0;
-  byte source = aByte;
+uint8_t flipByte(uint8_t aByte) {
+  uint8_t result = 0;
+  uint8_t source = aByte;
   for(int i=0; i<8; i++) {
     result >>= 1;
     result |= source&0x80;
@@ -493,7 +1147,7 @@ byte flipByte(byte aByte) {
   return result;
 }
 
-void CopyTimeToByteUint(byte* data, byte* key, struct DataContainer* container) {
+void CopyTimeToByteUint(uint8_t* data, uint8_t* key, struct DataContainer* container) {
   container->mByteUint1.FullUint = 0;
   container->mByteUint2.FullUint = 0;
   container->mByteUint3.FullUint = 0;
@@ -515,13 +1169,13 @@ void CopyTimeToByteUint(byte* data, byte* key, struct DataContainer* container) 
   // copy L
   container->mByteUint2.Byte0 = data[0];
   container->mByteUint2.Byte1 = data[1];
-  container->mByteUint2.Byte2 = (byte)(data[2] & 0x0F);
+  container->mByteUint2.Byte2 = (uint8_t)(data[2] & 0x0F);
 }
 
 
 void ShiftTimeRight(int round, struct DataContainer* container) {
   int count;
-  byte tmp;
+  uint8_t tmp;
 
   if ((round == 16) || (round == 8) || (round == 7) || (round == 3))
       count = 2;
@@ -570,7 +1224,7 @@ void CompressKey(struct DataContainer* container) {
 }
 
 void DoSbox(struct DataContainer* container) {
-  byte tmp, helper; //mByteR1B;
+  uint8_t tmp, helper; //mByteR1B;
 
   helper = container->mByteUint1.Byte3;                // R1B = R15;
   container->mByteUint1.Byte3 = container->mByteUint1.Byte2;      // R15 = R14
@@ -578,12 +1232,12 @@ void DoSbox(struct DataContainer* container) {
   // INNER LOOP
   for (int i = 5; i > 0; i--) {
       if ((i & 1) == 0) { // round 4,2
-          tmp = (byte)(container->mByteUint1.Byte0 >> 4);    // swap R12
-          tmp |= (byte)((container->mByteUint1.Byte0 & 0x0f) << 4);
+          tmp = (uint8_t)(container->mByteUint1.Byte0 >> 4);    // swap R12
+          tmp |= (uint8_t)((container->mByteUint1.Byte0 & 0x0f) << 4);
           container->mByteUint1.Byte0 = tmp;
       }
       container->mByteUint1.Byte3 &= 0xF0;           // set R1C
-      tmp = (byte)((container->mByteUint1.Byte0 & 0x0F) | container->mByteUint1.Byte3);
+      tmp = (uint8_t)((container->mByteUint1.Byte0 & 0x0F) | container->mByteUint1.Byte3);
 
       if ((i & 4) != 0)
           tmp = mByteArrLookupTable1C_1[(tmp & 0x3F)];
@@ -595,9 +1249,9 @@ void DoSbox(struct DataContainer* container) {
           tmp = mByteArrLookupTable1C_3[(tmp & 0x3F)];
 
       if ((i & 1) != 0)
-          container->mByteUint4.Byte0 = (byte)(tmp & 0x0F);
+          container->mByteUint4.Byte0 = (uint8_t)(tmp & 0x0F);
       else
-          container->mByteUint4.Byte0 |= (byte)(tmp & 0xF0);
+          container->mByteUint4.Byte0 |= (uint8_t)(tmp & 0xF0);
 
       if ((i & 1) == 0) { // copy 14->13->12, 1C->1E->1D
           tmp = container->mByteUint1.Byte3;
@@ -630,7 +1284,7 @@ void DoPbox(struct DataContainer* container) {
 }
 
 
-void Decrypt(byte* cipher, byte* key, byte* result) {
+void Decrypt(uint8_t* cipher, uint8_t* key, uint8_t* result) {
   DataContainer container;
 
   CopyTimeToByteUint(cipher, key, &container);
@@ -660,9 +1314,9 @@ void Decrypt(byte* cipher, byte* key, byte* result) {
 
   container.mByteUint3.FullUint <<= 4;
   container.mByteUint2.Byte2 &= 0x0F;
-  container.mByteUint2.Byte2 |= (byte)(container.mByteUint3.Byte0 & 0xF0);
+  container.mByteUint2.Byte2 |= (uint8_t)(container.mByteUint3.Byte0 & 0xF0);
 
-  //R0B0C0D0E.byte.R0D |= (R08090A.byte.R08 & 0xF0);
+  //R0B0C0D0E.uint8_t.R0D |= (R08090A.uint8_t.R08 & 0xF0);
   result[0] = container.mByteUint2.Byte0;
   result[1] = container.mByteUint2.Byte1;
   result[2] = container.mByteUint2.Byte2;
@@ -671,19 +1325,19 @@ void Decrypt(byte* cipher, byte* key, byte* result) {
 }
 
 
-bool GetWeatherInfo(byte* aWeatherInfo) {
+bool GetWeatherInfo(uint8_t* aWeatherInfo) {
   bool lValid = false;
   int uiBitCnt;
-  byte ucTemp = 0;
-  byte cipher[5];
-  byte key[5];
-  byte PlainBytes[5];
+  uint8_t ucTemp = 0;
+  uint8_t cipher[5];
+  uint8_t key[5];
+  uint8_t PlainBytes[5];
   uiBitCnt = 0;
   int uiCnt = 1;
 
   for (; uiCnt < 42; uiCnt++) {
       if (uiCnt != 7) {
-          ucTemp = (byte)(ucTemp >> 1);
+          ucTemp = (uint8_t)(ucTemp >> 1);
           if (mWeatherData[uiCnt] == 1)
               ucTemp |= 0x80;
           uiBitCnt++;
@@ -693,7 +1347,7 @@ bool GetWeatherInfo(byte* aWeatherInfo) {
   }
   uiBitCnt=0;
   for (; uiCnt < 82; uiCnt++) {
-          ucTemp = (byte)(ucTemp >> 1);
+          ucTemp = (uint8_t)(ucTemp >> 1);
           if (mWeatherData[uiCnt] == 1)
               ucTemp |= 0x80;
           uiBitCnt++;
@@ -731,14 +1385,14 @@ bool GetWeatherInfo(byte* aWeatherInfo) {
 }
 
 
-int weatherunbinary(int a, int b) {
+int weatherunbinary(int index, int a, int b) {
   int val = 0;
   for (int i = 0; i < 16; i++) {
-    if (! weathermemory[fourdayforecast].substring(a, b) [i]) {
+    if (! weathermemory[index].substring(a, b) [i]) {
       break;
     }
     val <<= 1;
-    val |= (weathermemory[fourdayforecast].substring(a, b) [i] == '1') ? 1 : 0;
+    val |= (weathermemory[index].substring(a, b) [i] == '1') ? 1 : 0;
   }
   return val;
 }
@@ -757,10 +1411,10 @@ int binStrToDec( String input ) {
 }
 
 
-String decToBinStr( byte aInfo[3] ) {
+String decToBinStr( uint8_t aInfo[3] ) {
   String out = "";
   out.reserve(25);
-  for(byte a=0;a<3;a++) {
+  for(uint8_t a=0;a<3;a++) {
     for (int i = 7; i >=0; i--) {
       //bits[i] = (aInfo[a] >> i) & 1;
       out += String( (aInfo[a] >> i) & 1 ); // bits[i];
@@ -770,15 +1424,15 @@ String decToBinStr( byte aInfo[3] ) {
 }
 
 
-static void updateIcons( SpriteSheetIcon icon1, SpriteSheetIcon icon2, SpriteSheetIcon icon3 );
-static bool weatherReady = false;
+
 
 // TODO: move this to UI.h
 void showWeather() {
 
-  String out = "";
-  String citiesNames = "";
   char str[255];
+  int fourdayforecast = 0;
+  int twodayforecast = 0;
+
   /*
     0110  Day critical weather
         0001  Night critical weather
@@ -791,8 +1445,8 @@ void showWeather() {
   int dcw  = binStrToDec( meteodata.substring(0, 4) );   // Day critical weather
   int ncw  = binStrToDec( meteodata.substring(4, 8) );   // Night critical weather
   int xwh  = binStrToDec( meteodata.substring(8, 12) );  // Extremeweather
-  int anm1 = binStrToDec( meteodata.substring(8, 10) );
-  int anm2 = binStrToDec( meteodata.substring(10, 12) );
+  int anm1 = binStrToDec( meteodata.substring(8, 10) );  // Weather anomality 1
+  int anm2 = binStrToDec( meteodata.substring(10, 12) ); // Weather anomality 2
   int rpb  = binStrToDec( meteodata.substring(12, 15) ); // Rainprobability
   int anm  = binStrToDec( meteodata.substring(15, 16) ); // Anomaly
   int tem  = binStrToDec( meteodata.substring(16, 22) ); // Temperature
@@ -819,37 +1473,23 @@ void showWeather() {
   twodayforecast += 60;
 
   log_d("four: %d, two: %d", fourdayforecast, twodayforecast);
-  Serial.print("");
+  Serial.println("*******************************"); // 31 stars
   delay(10);
 
   if (dcfHour < 21) { //Between 21:00-23:59 significant weather & temperature is for cities 60-89 wind and wind direction for cities 0-59.
     if ((dcfHour) % 6 < 3) {
       weathermemory[fourdayforecast] = meteodata;  // Extreme weather is valid from this hour but also +3 hour
-      significantweather[fourdayforecast] = weatherunbinary(8, 12);
+      significantweather[fourdayforecast] = weatherunbinary(fourdayforecast, 8, 12);
     }
-
-
-
-    sprintf( str, "Area 4day f/c =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "4day f/c %5s =      %d ", String( (((dcfHour) % 6) > 2) ? "Night" : "Day" ).c_str(), int( (dcfHour / 6) + 1 ) );
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "Day               =   %s %02x ", meteodata.substring(0, 4).c_str(), dcw);
-    Serial.print( str );
-    out += String(str);
-
-    sprintf( str, "%s ", weather[dcw].label);
+    sprintf( str, "Area 4day f/c =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name); Serial.println( str );
+    sprintf( str, "4day f/c %5s =      %d ", String( (((dcfHour) % 6) > 2) ? "Night" : "Day" ).c_str(), int( (dcfHour / 6) + 1 ) ); Serial.println( str );
+    sprintf( str, "Day Forecast      =   %s %02x %s ", meteodata.substring(0, 4).c_str(), dcw, weather[dcw].label); Serial.print( str );
     if (dcw == 5 || dcw == 6 || dcw == 13 || dcw == 7) {
       if (significantweather[fourdayforecast] == 1 || significantweather[fourdayforecast] == 2) {
-        sprintf( str, "%s%s with thunderstorms ", (dcw != 6) ? "Heavy " : "", weather[dcw].label);
-      }
-    }
-    Serial.println( str );
-    out += String(str);
-
-    sprintf( str, "Night             =   %s %02x ", meteodata.substring(4, 8).c_str(), ncw);
+        sprintf( str, "%s%s with thunderstorms ", (dcw != 6) ? "Heavy " : "", weather[dcw].label); Serial.println( str );
+      } else Serial.println();
+    } else Serial.println();
+    sprintf( str, "Night Forecast    =   %s %02x ", meteodata.substring(4, 8).c_str(), ncw); Serial.print( str );
     if (ncw == 5 || ncw == 6 || ncw == 13 || ncw == 7) {
       if (significantweather[fourdayforecast] == 1 || significantweather[fourdayforecast] == 3) {
         sprintf( str, "%s%s with thunderstorms ", (ncw != 6) ? "Heavy " : "", weather[ncw].label);
@@ -864,84 +1504,39 @@ void showWeather() {
       }
     }
     Serial.println( str );
-    out += String(str);
-
     if ((dcfHour) % 6 < 3) {
-      sprintf( str, "Extremeweather    =   ");
-      Serial.print( str );
-      out += String(str);
+      sprintf( str, "Extremeweather    =   "); Serial.print( str );
       if (xwh == 0) { // DI=0 and WA =0
-        sprintf( str, "%s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].label);
-        Serial.println( str );
-        out += String(str);
+        sprintf( str, "%s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].label); Serial.println( str );
       } else {
-        sprintf( str, "%s %02x %s ", meteodata.substring(8, 10).c_str(), anm1, anomaly1[anm1].label );
-        Serial.println( str );
-        out += String(str);
-        sprintf( str, "%s %02x %s ", meteodata.substring(10, 12).c_str(), anm2, anomaly2[anm2].label );
-        Serial.println( str );
-        out += String(str);
+        sprintf( str, "%s %02x %s ", meteodata.substring(8, 10).c_str(), anm1, anomaly1[anm1].label ); Serial.println( str );
+        sprintf( str, "%s %02x %s ", meteodata.substring(10, 12).c_str(), anm2, anomaly2[anm2].label ); Serial.println( str );
       }
-      sprintf( str, "Rainprobability   =    %s %02x %s ", meteodata.substring(12, 15).c_str(), rpb, rainprobability[rpb].label );
-      Serial.println( str );
-      out += String(str);
+      sprintf( str, "Rainprobability   =    %s %02x %s ", meteodata.substring(12, 15).c_str(), rpb, rainprobability[rpb].label ); Serial.println( str );
     }
     if ((dcfHour) % 6 > 2) {
       icon2 = winddirection[xwh].icon;
-      sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label);
-      Serial.println( str );
-      out += String(str);
-      sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label);
-      Serial.println( str );
-      out += String(str);
-      sprintf( str, "Extremeweather    =   %s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].label);
-      Serial.println( str );
-      out += String(str);
+      sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label); Serial.println( str );
+      sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label); Serial.println( str );
+      sprintf( str, "Extremeweather    =   %s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].label); Serial.println( str );
     }
-    sprintf( str, "Weather Anomality =      %s %02x %s ", meteodata.substring(15, 16).c_str(), anm, (anm == 1) ? "Yes" : "No");
-    Serial.println( str );
-    out += String(str);
-
-    sprintf( str, " 4 day: %s ", cities[fourdayforecast].name );
-    citiesNames += str;
-
+    sprintf( str, "Weather Anomality =      %s %02x %s ", meteodata.substring(15, 16).c_str(), anm, (anm == 1) ? "Yes" : "No"); Serial.println( str );
 
   } else {
     //Serial.printf("Area 4dayforecast =   %d %s\n", fourdayforecast, town[fourdayforecast].c_str());
-    sprintf( str, "Area 4dayforecast =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "fourday f/c %5s =      %d ", (((dcfHour) % 6) > 2) ? "Night" : "Day", (dcfHour / 6) + 1);
-    Serial.println( str );
-    out += String(str);
+    sprintf( str, "Area 4dayforecast =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name); Serial.println( str );
+    sprintf( str, "fourday f/c %5s =      %d ", (((dcfHour) % 6) > 2) ? "Night" : "Day", (dcfHour / 6) + 1); Serial.println( str );
     icon2 = winddirection[xwh].icon;
-    sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "Area 2dayforecast =   %d %s (%s) ", twodayforecast, cities[twodayforecast].name, cities[twodayforecast].country.name);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "twoday f/c day    =      %d ", (((dcfHour - 21) * 60 + dcfMinute) > 90) ? 2 : 1);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "Day               =   %s %02x %s ", meteodata.substring(0, 4).c_str(), dcw, weather[dcw].label);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "Night             =   %s %02x %s ", meteodata.substring(4, 8).c_str(), ncw, (ncw == 1) ? "Clear" : weather[ncw].label);
-    Serial.println( str );
-    out += String(str);
-    sprintf( str, "Weather Anomality =      %s %02x %s ", meteodata.substring(15, 16).c_str(), anm, (anm == 1) ? "Yes" : "No");
-    Serial.println( str );
-    out += String(str);
-
-    sprintf( str, " 2 day: %s ", cities[twodayforecast].name );
-    citiesNames += str;
+    sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label); Serial.println( str );
+    sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label); Serial.println( str );
+    sprintf( str, "Area 2dayforecast =   %d %s (%s) ", twodayforecast, cities[twodayforecast].name, cities[twodayforecast].country.name); Serial.println( str );
+    sprintf( str, "twoday f/c day    =      %d ", (((dcfHour - 21) * 60 + dcfMinute) > 90) ? 2 : 1); Serial.println( str );
+    sprintf( str, "Day               =   %s %02x %s ", meteodata.substring(0, 4).c_str(), dcw, weather[dcw].label); Serial.println( str );
+    sprintf( str, "Night             =   %s %02x %s ", meteodata.substring(4, 8).c_str(), ncw, (ncw == 1) ? "Clear" : weather[ncw].label); Serial.println( str );
+    sprintf( str, "Weather Anomality =      %s %02x %s ", meteodata.substring(15, 16).c_str(), anm, (anm == 1) ? "Yes" : "No"); Serial.println( str );
   }
 
-  String temperatureStr;
+  String temperatureStr = "xxxxx yyyC xxxxmum";
 
   if (tem == 0) {
     temperatureStr = "<-21 " + String(degreeSign) + "C";
@@ -957,23 +1552,17 @@ void showWeather() {
   } else {
     temperatureStr += " maximum";
   }
-  sprintf( str, "Temperature       = %s %02x %s ", meteodata.substring(16, 22).c_str(), tem, temperatureStr.c_str());
-  Serial.println( str );
-  out += String(str);
-  //sprintf( str, "Decoder status    =     %s    %s ", meteodata.substring(22, 24).c_str(), meteodata.substring(22, 24) == "10" ? "OK" : "NOT OK");
-  //Serial.println( str );
-  //out += String(str);
-  #ifdef DCF77_DO_WEATHER
+  sprintf( str, "Temperature       = %s %02x %s ", meteodata.substring(16, 22).c_str(), tem, temperatureStr.c_str()); Serial.println( str );
+  sprintf( str, "Decoder status    =     %s    %s ", meteodata.substring(22, 24).c_str(), meteodata.substring(22, 24) == "10" ? "OK" : "NOT OK"); Serial.println( str );
 
-    if(  ( cities[twodayforecast].country  == watchedCountry && strcmp( cities[twodayforecast].name, watchedCity ) == 0 )
-      || ( cities[fourdayforecast].country == watchedCountry && strcmp( cities[fourdayforecast].name, watchedCity ) == 0)
-    ) {
-      Serial.println("Country + city match, should update scroll and icons !!");
-      //updateScroll( out );
-      updateScroll( citiesNames );
-      updateIcons( icon1, icon2, icon3 );
-    } else {
-      Serial.println("Forecast for this country+city will not be displayed");
-    }
-  #endif
+  if(  ( twodayforecast <=90 && strcmp( cities[twodayforecast].name, watchedCity ) == 0 )
+    || ( fourdayforecast<=90 && strcmp( cities[fourdayforecast].name, watchedCity ) == 0)
+  ) {
+    Serial.println("City match, should update scroll and icons !!");
+    //updateScroll( citiesNames );
+    updateIcons( icon1, icon2, icon3 );
+  } else {
+    Serial.println("Forecast for this country+city will not be displayed");
+  }
+
 }
