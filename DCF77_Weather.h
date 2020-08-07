@@ -117,6 +117,7 @@ int findCityIndexByCityId( int cityID ) {
   for( int i=0;i< citiesLength; i++ ) {
     if( cities[i].name == nullptr ) break;
   }
+  return -1;
 }
 
 int findCityIDByName( const char* cityName ) {
@@ -469,12 +470,12 @@ struct WeatherData {
           hour,
           minute,
           cities[city4DayIndex].name,
-          wData.substring(0, 4),   // Day critical weather
-          wData.substring(4, 8),   // Night critical weather
-          wData.substring(8, 12),  // Weather anomalities combined
-          wData.substring(12, 15), // Rainprobability
-          wData.substring(15, 16), // Anomaly
-          wData.substring(16, 22)  // Temperature
+          wData.substring(0, 4).c_str(),   // Day critical weather
+          wData.substring(4, 8).c_str(),   // Night critical weather
+          wData.substring(8, 12).c_str(),  // Weather anomalities combined
+          wData.substring(12, 15).c_str(), // Rainprobability
+          wData.substring(15, 16).c_str(), // Anomaly
+          wData.substring(16, 22).c_str()  // Temperature
         );
       } else {
         sprintf( WeatherDataStr, WeatherDataTpl2,
@@ -482,12 +483,12 @@ struct WeatherData {
           minute,
           cities[city4DayIndex].name,
           cities[city2Dayindex].name,
-          wData.substring(0, 4),   // Day critical weather
-          wData.substring(4, 8),   // Night critical weather
-          wData.substring(8, 12),  // Weather anomalities combined
-          wData.substring(12, 15), // Rainprobability
-          wData.substring(15, 16), // Anomaly
-          wData.substring(16, 22)  // Temperature
+          wData.substring(0, 4).c_str(),   // Day critical weather
+          wData.substring(4, 8).c_str(),   // Night critical weather
+          wData.substring(8, 12).c_str(),  // Weather anomalities combined
+          wData.substring(12, 15).c_str(), // Rainprobability
+          wData.substring(15, 16).c_str(), // Anomaly
+          wData.substring(16, 22).c_str()  // Temperature
         );
       }
       Serial.printf( "[%03d] %s", fcast->forecastID, WeatherDataStr );
@@ -527,7 +528,7 @@ struct WeatherData {
   const char*            TemperatureTrend = nullptr;
 
   void reset() {
-    AreaCountryID;
+    AreaCountryID = -1;
     AreaCountryName = nullptr;
     AreaCityName = nullptr;
     AreaTimeSlice1 = -1;
@@ -711,21 +712,21 @@ struct WeatherData {
     } else {
       // Between 21:00-23:59 significant weather & temperature is for cities 60-89, wind and wind direction for cities 0-59.
       pattern = PATH_2;
-      /*Area1 Country name*/      cities[city4DayIndex].country.name;
-      /*Area1 City name*/         cities[city4DayIndex].name;
-      /*Area1 Time slice*/        (((hour) % 6) > 2) ? LABEL_NIGHT : LABEL_DAY, int((hour / 6) + 1);
-      /*Area1 Day weather*/       weather[dcw].label;
-      /*Area1 Night weather*/     ncw, (ncw == 1) ? LABEL_CLEAR : weather[ncw].label;
-      /*Area1 Weather Anomality*/ (anm == 1) ? LABEL_YES : LABEL_NO;
+      ///*Area1 Country name*/      cities[city4DayIndex].country.name;
+      ///*Area1 City name*/         cities[city4DayIndex].name;
+      ///*Area1 Time slice*/        (((hour) % 6) > 2) ? LABEL_NIGHT : LABEL_DAY, int((hour / 6) + 1);
+      ///*Area1 Day weather*/       weather[dcw].label;
+      ///*Area1 Night weather*/     ncw, (ncw == 1) ? LABEL_CLEAR : weather[ncw].label;
+      ///*Area1 Weather Anomality*/ (anm == 1) ? LABEL_YES : LABEL_NO;
       renderSerial();
       if( do_sprite ) renderSprite();
       pattern = PATH_3;
-      /*Area2 Country name*/      cities[city2Dayindex].country.name;
-      /*Area2 City name*/         cities[city2Dayindex].name;
-      /*Area2 Time slice*/        (((hour - 21) * 60 + minute) > 90) ? 2 : 1;
-      /*Area2 Winddirection*/     winddirection[xwh].label;
-      /*Area2 Winddirection Icon*/winddirection[xwh].icon;
-      /*Area2 Windstrength*/      windstrength[rpb].label;
+      ///*Area2 Country name*/      cities[city2Dayindex].country.name;
+      ///*Area2 City name*/         cities[city2Dayindex].name;
+      ///*Area2 Time slice*/        (((hour - 21) * 60 + minute) > 90) ? 2 : 1;
+      ///*Area2 Winddirection*/     winddirection[xwh].label;
+      ///*Area2 Winddirection Icon*/winddirection[xwh].icon;
+      ///*Area2 Windstrength*/      windstrength[rpb].label;
       renderSerial();
 
     }
