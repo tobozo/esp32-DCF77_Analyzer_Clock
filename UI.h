@@ -26,8 +26,7 @@
 
   // using LovyanGFX device detection
 
-  #define LGFX_AUTODETECT
-  #include <LGFX_TFT_eSPI.h>
+  #include <LovyanGFX.hpp>
   #include <Wire.h>
 
   // Custom SD config
@@ -47,7 +46,11 @@
     static constexpr int spi_sclk =  5;
   };
   static lgfx::Panel_ST7735S panel; // panel name picked from /LovyanGFX/src/lgfx/panel/
-  static lgfx::LGFX_SPI<LGFX_Config> tft;
+  typedef lgfx::LGFX_SPI<LGFX_Config> LGFX;
+  static LGFX tft;
+
+  //#define LGFX_AUTODETECT
+  #include <LGFX_TFT_eSPI.h>
 
   void M5Begin()
   {
@@ -81,7 +84,7 @@
       SPI.begin();
       M5STACK_SD.begin(TFCARD_CS_PIN, SPI, 20000000);
 
-      if ( lgfx::LGFX_Config::spi_host == HSPI_HOST ) {
+      if ( LGFX_Config::spi_host == HSPI_HOST ) {
         tft.setSPIShared(false);
       }
     #else
