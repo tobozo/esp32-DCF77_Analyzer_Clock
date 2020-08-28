@@ -2,29 +2,66 @@
 #define _UI_H_
 
 
-#define LGFX_ONLY
+void touchLoop();
+void touchCalibrate();
+//#include <XPT2046_Touchscreen.h>
+#define TOUCH_CS 21 // enable touch
+#define TOUCH_FREQ 20000000
+
+//XPT2046_Touchscreen ts(TOUCH_CS);
+
+//#define LGFX_ONLY
 
 #ifndef LGFX_ONLY
 
   // using ESP32-Chimera-Core device list
 
+  //#define LGFX_ONLY
+  #undef LGFX_AUTODETECT
+  #define LGFX_LOLIN_D32_PRO
   #include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
   #define tft M5.Lcd // syntax sugar
+  #define Display320x240 // warn: 320x240 frame buffer may exceed available ram, use tft.setColorDepth( 8 )
+
 
   void M5Begin()
   {
+
+    #ifdef TOUCH_CS
+    M5.setTouchSpiShared( TOUCH_CS ); // call this before M5.begin() !!
+    #endif
+
     if( SERIAL_SPEED != 115200 ) {
       M5.begin(true, SD_ENABLE, false);
       Serial.begin( SERIAL_SPEED );
     } else {
       M5.begin();
     }
+
+    tft.drawRect(10,10,20,20,0xFFFF);
+    tft.print("BLAH");
+    delay(1000);
+
+    #ifdef TOUCH_CS
+    if( M5.ts == nullptr ) {
+      Serial.println("No touch mounted, aborting");
+      while(1);
+    }
+
+    uint16_t calData[5] = { 808, 2241, 599, 3448, 0 };
+    tft.setTouch(calData);
+
+    while(1) {
+      touchLoop();
+    }
+    #endif
+
   }
 
 
 #else
 
-  // using LovyanGFX device detection
+  // bypassing LovyanGFX device detection
 
   #include <LovyanGFX.hpp>
   #include <Wire.h>
@@ -34,23 +71,38 @@
   #define M5STACK_SD SD     // or SD_MMC,   SPIFFS,   LittleFS
   #define USE_TFCARD_CS_PIN // comment in/out if necessary
   #define TFCARD_CS_PIN 13  // edit if necessary
+  //#define DisplayPanel lgfx::Panel_ST7735S
+  #define DisplayPanel lgfx::Panel_ILI9341
+  #define Display320x240
 
   // custom TFT config
   struct LGFX_Config
   {
     // values picked from /LovyanGFX/src/config/
+    /*
+    // pinout TTGO_TS
     static constexpr spi_host_device_t spi_host = VSPI_HOST;
     static constexpr int dma_channel = 1;
     static constexpr int spi_mosi = 23;
     static constexpr int spi_miso = -1;
     static constexpr int spi_sclk =  5;
+    */
+    // pinout LoLin D32Pro for ILI9341
+    static constexpr spi_host_device_t spi_host = VSPI_HOST;
+    static constexpr int dma_channel = 1;
+    static constexpr int spi_sclk = 18;
+    static constexpr int spi_mosi = 23;
+    static constexpr int spi_miso = 19;
+    static constexpr int spi_dlen = 8;
   };
-  static lgfx::Panel_ST7735S panel; // panel name picked from /LovyanGFX/src/lgfx/panel/
-  typedef lgfx::LGFX_SPI<LGFX_Config> LGFX;
-  static LGFX tft;
+  static DisplayPanel panel; // panel name picked from /LovyanGFX/src/lgfx/panel/
+  //typedef lgfx::LGFX_SPI<LGFX_Config> LGFX;
+  //static LGFX tft;
 
-  //#define LGFX_AUTODETECT
-  #include <LGFX_TFT_eSPI.h>
+  static lgfx::LGFX_SPI<LGFX_Config> tft;
+  //static LGFX tft;
+
+  #include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
 
   void M5Begin()
   {
@@ -58,6 +110,7 @@
     Serial.printf("Custom ESP32 started at %d bauds!", SERIAL_SPEED);
 
     // custom TFT pinout
+    /*
     // Panel_TTGO_TS panel, pinout picked from /LovyanGFX/src/lgfx/panel/
     panel.freq_write = 20000000;
     panel.panel_width  = 128;
@@ -72,12 +125,55 @@
     panel.gpio_rst  = 9;
     panel.gpio_bl   = 27;
     panel.pwm_ch_bl = 7;
+    */
+
+
+    // Panel pinout for LoLin D32Pro + ILI9341
+    panel.freq_write = 20000000;
+    panel.freq_fill  = 27000000;
+    panel.freq_read  = 16000000;
+    panel.spi_mode = 0;
+    panel.spi_mode_read = 0;
+    panel.len_dummy_read_pixel = 8;
+    panel.spi_read = true;
+    panel.spi_3wire = false;
+    panel.spi_cs = 14;
+    panel.spi_dc = 27;
+    panel.gpio_rst = 33;
+    panel.gpio_bl  = 32;
+    panel.pwm_ch_bl = 7;
+    panel.backlight_level = true;
+    panel.invert = false;
+    panel.rgb_order = false;
+    panel.memory_width  = 240;
+    panel.memory_height = 320;
+    panel.panel_width  = 240;
+    panel.panel_height = 320;
+    panel.offset_x = 0;
+    panel.offset_y = 0;
+    panel.rotation = 0;
+    panel.offset_rotation = 0;
+
     tft.setPanel(&panel);
     tft.init();
 
+
+    tft.drawRect(10,10,20,20,0xFFFF);
+    tft.print("BLAH");
+    delay(1000);
+
+    tft.clearScreen();
+
+    touchCalibrate();
+
+
+    while(1) {
+      touchLoop();
+    }
+
     #if defined ( USE_TFCARD_CS_PIN ) && defined( TFCARD_CS_PIN )
 
-      log_d("Enabling SD from TFCARD_CS_PIN");
+      log_d("Enabling SD from TFCARD_CS_PIN (%d)", TFCARD_CS_PIN);
 
       M5STACK_SD.end();
       SPI.end();
@@ -95,7 +191,105 @@
 
   }
 
+
 #endif
+
+
+
+#ifdef TOUCH_CS
+// Code to run a screen calibration, not needed when calibration values set in setup()
+void touchCalibrate()
+{
+  uint16_t calData[5];
+  uint8_t calDataOK = 0;
+
+  // Calibrate
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(20, 0);
+  tft.setTextFont(2);
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  tft.println("Touch corners as indicated");
+
+  tft.setTextFont(1);
+  tft.println();
+
+  tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
+
+  Serial.println(); Serial.println();
+  Serial.println("// Use this calibration code in setup():");
+  Serial.print("  uint16_t calData[5] = ");
+  Serial.print("{ ");
+
+  for (uint8_t i = 0; i < 5; i++)
+  {
+    Serial.print(calData[i]);
+    if (i < 4) Serial.print(", ");
+  }
+
+  Serial.println(" };");
+  Serial.print("  tft.setTouch(calData);");
+  Serial.println(); Serial.println();
+
+  tft.fillScreen(TFT_BLACK);
+
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  tft.println("Calibration complete!");
+  tft.println("Calibration code sent to Serial port.");
+
+  delay(4000);
+}
+
+boolean wastouched = true;
+void touchLoop()
+{
+  boolean istouched = M5.ts->touched();
+  if (istouched) {
+    TS_Point p = M5.ts->getPoint();
+
+    p.x = map(p.x, 540, 3200, 0, tft.width() );
+    p.y = map(p.y, 196, 4096, 0, tft.height() );
+
+    if (!wastouched) {
+      //tft.print("Touchstart");
+    }
+
+    if( p.z > 200 ) {
+      tft.fillCircle( p.x, p.y, 3, TFT_WHITE );
+      Serial.printf("x = %4d, y = %4d, z = %4d\n", p.x, p.y, p.z );
+    } else {
+      // false positive reading
+    }
+
+
+  } else {
+    if (wastouched) {
+      //tft.print("Touchend");
+    }
+    //Serial.println("no touch");
+  }
+  wastouched = istouched;
+  delay(15);
+}
+
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #include "Config.h"
 #include "SpriteSheet.h"
@@ -190,7 +384,7 @@ void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle )
 
 
 
-#if defined( ARDUINO_M5Stack_Core_ESP32 ) || defined( ARDUINO_M5STACK_FIRE )
+#if defined( ARDUINO_M5Stack_Core_ESP32 ) || defined( ARDUINO_M5STACK_FIRE ) || defined( Display320x240 )
   #include "UI_320x240.h"
 #else
   #include "UI_160x128.h"
@@ -269,8 +463,8 @@ UIModes UIMode = DCF_CLOCK;
   //static int scrollFontSize = int_scrollFontSize;
   //static bool isScrolling = false;
   //static uint16_t scrollFontColor;
-  static uint16_t scrollFontColorDisabled = TFT_DARKGRAY;
-  static uint16_t scrollFontColorEnabled = TFT_GRAY;
+  //static uint16_t scrollFontColorDisabled = TFT_DARKGRAY;
+  //static uint16_t scrollFontColorEnabled = TFT_GRAY;
 #endif
 
 //void sprite_drawJpg( TFT_eSprite *spr, int16_t x, int16_t y, const uint8_t * jpg_data, size_t jpg_len, uint16_t maxWidth, uint16_t maxHeight );
@@ -342,7 +536,9 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
       case DCF_CLOCK:
         if( M5.BtnC.isPressed() ) longPushCounter++;
         else longPushCounter = 0;
-        if ( M5.BtnA.wasPressed() ) dumpWeather();
+        #ifdef DCF77_DO_WEATHER
+          if ( M5.BtnA.wasPressed() ) dumpWeather();
+        #endif
         if ( M5.BtnB.wasPressed() ) dcf77SoundSwitch = 1 - dcf77SoundSwitch;
       break;
       case COOK_TIMER:
@@ -582,15 +778,15 @@ void LedDisplay( int addr, String leftOrRight, int value )
 
 void LedDCFStatus( int status )
 {
-  uint16_t color = TFT_GRAY;
+  //uint16_t color = TFT_GRAY;
   switch ( status ) {
     case 0:
       LedDCFStatusFontStyle->setTextStyle( LedDCFStatusStyleKO );
-      color = TFT_RED;
+      //color = TFT_RED;
       break;
     case 1:
       LedDCFStatusFontStyle->setTextStyle( LedDCFStatusStyleOK );
-      color = TFT_GREEN;
+      //color = TFT_GREEN;
       break;
     case -1:
     default:
@@ -609,7 +805,7 @@ void LedParityStatus( byte paritynum, int status )
   int xpos = 0;
   int ypos = ( tft.height() -  2 * LedParityStatusFontHeight ) - 2; // TODO: normalize this
   String out = " ";
-  uint16_t color;
+  //uint16_t color;
 
   switch ( paritynum ) {
     case 1: out = "M"; break;
@@ -619,15 +815,15 @@ void LedParityStatus( byte paritynum, int status )
   }
   switch (status) {
     case -1:
-      color = TFT_LIGHTGRAY;
+      //color = TFT_LIGHTGRAY;
       LedParityStatusFontStyle->setTextStyle( LedParityStatusStyleNA );
       break;
     case 0:
-      color = TFT_GREEN;
+      //color = TFT_GREEN;
       LedParityStatusFontStyle->setTextStyle( LedParityStatusStyleOK );
       break;
     case 1:
-      color = TFT_RED;
+      //color = TFT_RED;
       LedParityStatusFontStyle->setTextStyle( LedParityStatusStyleKO );
       break;
     default:
@@ -754,7 +950,7 @@ void drawWeekDays( int daynum )
 void LedWeekStatus( int weekDay, int status )
 {
   int xpos = tft.width() - ( weekDayNamesWidth + 1 );
-  int ypos = ( tft.height() - (LedWeekStatusFontHeight) ) - 3;
+  //int ypos = ( tft.height() - (LedWeekStatusFontHeight) ) - 3;
   int weekDayBlockWidth = LedWeekStatusFontWidth + 2;
   int wpos = -1;
 
@@ -1134,13 +1330,13 @@ void scheduleBuzz( uint16_t note, int duration )
     }
     UIMode = DCF_SETUP;
     beforePicking = millis();
-    bool has_timed_out = false;
+    //bool has_timed_out = false;
     pickerTimeout = timeout;
     while( !pickedCity ) {
       checkButtons();
       paginateCities();
       if( beforePicking + pickerTimeout < millis() ) {
-        has_timed_out = true;
+        //has_timed_out = true;
         break;
       }
     }
@@ -1277,7 +1473,9 @@ static void InitUI()
 
   uint16_t* spritePtr = (uint16_t*)sprite.createSprite( tft.width(), tft.height() );
   if( spritePtr == NULL ) {
-    log_e("Unable to create spritePtr");
+    log_e("Unable to create 16bits spritePtr, will go with 8bits");
+    sprite.setColorDepth( 8 );
+    spritePtr = (uint16_t*)sprite.createSprite( tft.width(), tft.height() );
   } else {
     log_d("Successfully created spritePtr");
   }

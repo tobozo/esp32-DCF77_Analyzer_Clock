@@ -17,13 +17,13 @@
 #define TFT_DARKRED   tft.color565( 0xBB, 0x00, 0x00 )
 #define TFT_GREENISH  tft.color565( 0x00, 0xdd, 0x00 )
 
-static uint16_t DCFBitBufferYPos = 8;
+//static uint16_t DCFBitBufferYPos = 8;
 static uint16_t CETCESTYPos      = 118;
 static uint16_t LeapYearYpos     = 109;
 static uint16_t WeekNumberYpos   = 93;
-static uint16_t WeekDayNamesXpos = 127;
-static uint16_t WeekDayNamesYpos = 122;
-static uint16_t WeekDayLedYpos   = 117;
+//static uint16_t WeekDayNamesXpos = 127;
+//static uint16_t WeekDayNamesYpos = 122;
+//static uint16_t WeekDayLedYpos   = 117;
 
 // text styles
 TextStyle *myRTCDateTimeTextStyleOK = new TextStyle( 0xccffccU, 0x222222U, 1, 1, middle_center, false,  true );
