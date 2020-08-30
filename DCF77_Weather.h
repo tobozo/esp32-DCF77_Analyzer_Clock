@@ -1461,15 +1461,28 @@ void showWeather() {
   //DCFDateTime mDcfTime = mDcf.GetTime();
   // uint8_t yOff, m, d, hh, mm;
 
-  fourdayforecast = ((dcfHour) % 3) * 20;
-
-  if (dcfMinute > 0) {
-    fourdayforecast += (dcfMinute - 1) / 3;
-  }
-  if (dcfMinute > 0) {
-    twodayforecast = ((((dcfHour) * 60) + (dcfMinute - 1)) % 90) / 3;
+  int forecastMinute, forecastHour;
+  if( dcfMinute == 0 ) {
+    if( dcfHour == 0 ) {
+      forecastHour = 23;
+    } else {
+      forecastHour = dcfHour -1;
+    }
+    forecastMinute = 59;
   } else {
-    twodayforecast = ((dcfHour) * 60);
+    forecastHour = dcfHour;
+    forecastMinute = dcfMinute-1;
+  }
+
+  fourdayforecast = ((forecastHour) % 3) * 20;
+
+  if (forecastMinute > 0) {
+    fourdayforecast += (forecastMinute/* - 1*/) / 3;
+  }
+  if (forecastMinute > 0) {
+    twodayforecast = ((((forecastHour) * 60) + (forecastMinute/* - 1*/)) % 90) / 3;
+  } else {
+    twodayforecast = ((forecastHour) * 60);
   }
   twodayforecast += 60;
 
@@ -1477,13 +1490,13 @@ void showWeather() {
   Serial.println("*******************************"); // 31 stars
   delay(10);
 
-  if (dcfHour < 21) { //Between 21:00-23:59 significant weather & temperature is for cities 60-89 wind and wind direction for cities 0-59.
-    if ((dcfHour) % 6 < 3) {
+  if (forecastHour < 21) { //Between 21:00-23:59 significant weather & temperature is for cities 60-89 wind and wind direction for cities 0-59.
+    if ((forecastHour) % 6 < 3) {
       weathermemory[fourdayforecast] = meteodata;  // Extreme weather is valid from this hour but also +3 hour
       significantweather[fourdayforecast] = weatherunbinary(fourdayforecast, 8, 12);
     }
     sprintf( str, "Area 4day f/c =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name); Serial.println( str );
-    sprintf( str, "4day f/c %5s =      %d ", String( (((dcfHour) % 6) > 2) ? "Night" : "Day" ).c_str(), int( (dcfHour / 6) + 1 ) ); Serial.println( str );
+    sprintf( str, "4day f/c %5s =      %d ", String( (((forecastHour) % 6) > 2) ? "Night" : "Day" ).c_str(), int( (forecastHour / 6) + 1 ) ); Serial.println( str );
     sprintf( str, "Day Forecast      =   %s %02x %s ", meteodata.substring(0, 4).c_str(), dcw, weather[dcw].label); Serial.print( str );
     if (dcw == 5 || dcw == 6 || dcw == 13 || dcw == 7) {
       if (significantweather[fourdayforecast] == 1 || significantweather[fourdayforecast] == 2) {
@@ -1505,7 +1518,7 @@ void showWeather() {
       }
     }
     Serial.println( str );
-    if ((dcfHour) % 6 < 3) {
+    if ((forecastHour) % 6 < 3) {
       sprintf( str, "Extremeweather    =   "); Serial.print( str );
       if (xwh == 0) { // DI=0 and WA =0
         sprintf( str, "%s %02x %s ", weathermemory[fourdayforecast].substring(8, 12).c_str(), significantweather[fourdayforecast], heavyweather[significantweather[fourdayforecast]].label); Serial.println( str );
@@ -1515,7 +1528,7 @@ void showWeather() {
       }
       sprintf( str, "Rainprobability   =    %s %02x %s ", meteodata.substring(12, 15).c_str(), rpb, rainprobability[rpb].label ); Serial.println( str );
     }
-    if ((dcfHour) % 6 > 2) {
+    if ((forecastHour) % 6 > 2) {
       icon2 = winddirection[xwh].icon;
       sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label); Serial.println( str );
       sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label); Serial.println( str );
@@ -1526,12 +1539,12 @@ void showWeather() {
   } else {
     //Serial.printf("Area 4dayforecast =   %d %s\n", fourdayforecast, town[fourdayforecast].c_str());
     sprintf( str, "Area 4dayforecast =   %d %s (%s) ", fourdayforecast, cities[fourdayforecast].name, cities[fourdayforecast].country.name); Serial.println( str );
-    sprintf( str, "fourday f/c %5s =      %d ", (((dcfHour) % 6) > 2) ? "Night" : "Day", (dcfHour / 6) + 1); Serial.println( str );
+    sprintf( str, "fourday f/c %5s =      %d ", (((forecastHour) % 6) > 2) ? "Night" : "Day", (forecastHour / 6) + 1); Serial.println( str );
     icon2 = winddirection[xwh].icon;
     sprintf( str, "Winddirection     =   %s %02x %s ", meteodata.substring(8, 12).c_str(), xwh, winddirection[xwh].label); Serial.println( str );
     sprintf( str, "Windstrength      =    %s %02x %s  Bft ", meteodata.substring(12, 15).c_str(), rpb, windstrength[rpb].label); Serial.println( str );
     sprintf( str, "Area 2dayforecast =   %d %s (%s) ", twodayforecast, cities[twodayforecast].name, cities[twodayforecast].country.name); Serial.println( str );
-    sprintf( str, "twoday f/c day    =      %d ", (((dcfHour - 21) * 60 + dcfMinute) > 90) ? 2 : 1); Serial.println( str );
+    sprintf( str, "twoday f/c day    =      %d ", (((forecastHour - 21) * 60 + forecastMinute) > 90) ? 2 : 1); Serial.println( str );
     sprintf( str, "Day               =   %s %02x %s ", meteodata.substring(0, 4).c_str(), dcw, weather[dcw].label); Serial.println( str );
     sprintf( str, "Night             =   %s %02x %s ", meteodata.substring(4, 8).c_str(), ncw, (ncw == 1) ? "Clear" : weather[ncw].label); Serial.println( str );
     sprintf( str, "Weather Anomality =      %s %02x %s ", meteodata.substring(15, 16).c_str(), anm, (anm == 1) ? "Yes" : "No"); Serial.println( str );
@@ -1548,7 +1561,7 @@ void showWeather() {
   }
   // Night temperature is minimum
   // Daytime temperature is daytime maximum
-  if (((dcfHour) % 6) > 2 && (dcfHour < 21)) {
+  if (((forecastHour) % 6) > 2 && (forecastHour < 21)) {
     temperatureStr += " minimum";
   } else {
     temperatureStr += " maximum";
