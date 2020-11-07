@@ -5,7 +5,8 @@
 #ifdef DCF77_DO_WEATHER
   #include "DCF77_Weather.h" // Weather data support
 #endif
-
+int leapSecond = 0; // 1 if leap second on buffer 19 is set
+int leapSecBit = 0; // value of leap second bit (should be 0)
 // !! Pins 22 through 53 are only to be used for LED's
 #define LED_SUNDAY         22 // output - LED - Sunday
 #define LED_MONDAY         23 // output - LED - Monday
@@ -88,8 +89,8 @@ static int previousSecond      = 0;
 static int previousSignalState = 0;
 
 // DCF Buffers and indicators
-static int DCFbitBuffer[59]; // here, the received DCFbits are stored
-static int DCFbitFinalBuffer[59]; // here, the received DCFbits are stored
+static int DCFbitBuffer[60]; // here, the received DCFbits are stored
+static int DCFbitFinalBuffer[60]; // here, the received DCFbits are stored
 const int bitValue[] = {1, 2, 4, 8, 10, 20, 40, 80}; // these are the decimal values of the received DCFbits
 
 // only after start on a new minute, display received bits on inner LED ring
@@ -99,7 +100,7 @@ static int lastBufferPosition   = 0;
 static int previousMinute       = 0;
 static int previousHour         = 0;
 
-// variables to check if DCF bits are vald
+// variables to check if DCF bits are valid
 static bool dcfValidSignal  = false;
 static bool lastDcfValidSignal  = false;
 
@@ -142,6 +143,7 @@ typedef struct {
 coords ringLedCoords[4][60];
 
 // will be loaded from UI.h
+extern void LeapSecondWarning();
 extern void LedDisplay( int addr, String leftOrRight, int value );
 extern void error( int errorLed );
 extern void scheduleBuzz( uint16_t note, int duration );
@@ -242,7 +244,7 @@ void scanSignal() {
       errorCondition = false;
       // although we have an error, store current rising edge time to compare at the next Rising-Edge.
       previousLeadingEdge = leadingEdge;
-      #ifdef SPEAKER_PIN
+      #ifdef USE_SPEAKER
       if ( dcf77SoundSwitch == 1) scheduleBuzz( BEEPNOTE_ERROR, 60 );
       #endif
       return;
@@ -260,9 +262,9 @@ void scanSignal() {
     if ( leadingEdge - previousLeadingEdge > 1900 && leadingEdge - previousLeadingEdge < 2100 ) {
       // end of minute detected:
       copyBuffer();
-      // Reset DCFbitBuffer array, positions 0-58 (=59 bits)
-      for ( int i = 0; i < 59; i++ ) {
-        // Reset DCFbitBuffer array, positions 0-58 (=59 bits)
+      // Reset DCFbitBuffer array, positions 0-59 (=60 bits)
+      for ( int i = 0; i < 60; i++ ) {
+        // Reset DCFbitBuffer array, positions 0-59 (=60 bits)
         DCFbitBuffer[i] = 0;
       }
       bufferPosition   = 0;
@@ -277,13 +279,13 @@ void scanSignal() {
     if ( trailingEdge - leadingEdge < 170 ) { // call processDcfBit function and sent it the value '0'
       processDcfBit( 0 );
       // if switch is HIGH, the DCF pulses are audible
-      #ifdef SPEAKER_PIN
+      #ifdef USE_SPEAKER
         if ( dcf77SoundSwitch == 1) scheduleBuzz( BEEPNOTE_BIT_HIGH, 20 );
       #endif
     } else { // call processDcfBit function and sent it the value '1'
       processDcfBit( 1 );
       // if switch is HIGH, the DCF pulses are audible
-      #ifdef SPEAKER_PIN
+      #ifdef USE_SPEAKER
         if ( dcf77SoundSwitch == 1) scheduleBuzz( BEEPNOTE_BIT_LOW, 20 );
       #endif
     }
@@ -344,6 +346,12 @@ void processDcfBit( int dcfBit ) {
     dcfParityCheckP1 = 0;
     dcfParityCheckP2 = 0;
     dcfParityCheckP3 = 0;
+  }
+
+  if ( bufferPosition == 19 ) {
+    leapSecond = dcfBit;
+    // Serial.print("leapSecond = ");//Brett
+    // Serial.println(leapSecond);//Brett
   }
 
   // ----------------------------------------
@@ -425,6 +433,33 @@ void processDcfBit( int dcfBit ) {
     dcfParityCheckP1 + dcfParityCheckP2 + dcfParityCheckP3 == 3 ? dcfValidSignal = true : dcfValidSignal = false;
   }
 
+  // Brett Leap Second We are here because an extra bit has been detected could be a leap second so record the value
+  if ( bufferPosition == 59 ) {
+    leapSecBit = dcfBit;
+  }
+
+  if ( bufferPosition == 59 && lastDcfValidSignal == true && leapSecond == 1 && dcfMinute ==59 && leapSecBit == 0 ) {
+    //add leap second warning on TFT
+
+    LeapSecondWarning();
+
+    // record Leap Second date and time on serial port
+    Serial.print("Leap Second Inserted ");//Brett
+      Serial.print( dcfHour );
+      Serial.print( "0" );
+      Serial.print( ":" );
+      Serial.print( dcfMinute );
+      Serial.print( ":" );
+      Serial.print( bufferPosition +1 );
+      //Serial.print( second() );
+      Serial.print( " " );
+      Serial.print( dcfDay );
+      Serial.print( "/" );
+      Serial.print( dcfMonth );
+      Serial.print( "/" );
+      Serial.println( dcfYear );
+  }
+
   //--------------------------------------------------------------------
   // before continuing with the next bit, increment counter
   //--------------------------------------------------------------------
@@ -433,7 +468,24 @@ void processDcfBit( int dcfBit ) {
   //--------------------------------------------------------------------
   // check if we have not received too many pulses?
   //--------------------------------------------------------------------
-  if ( bufferPosition > 59 ) {
+  if ( bufferPosition == 60 && leapSecond == 1 ) {
+    //Serial.println("Leap Second01");
+    if ( bufferPosition > 60 ) {
+      // Serial.println("buffer overflow >60");
+      // Buffer Overflow ERROR - we have received more pulses before reaching
+      // the 2 second 'gap' signalling the end of the minute.
+      //This error may be due to a noisy signal giving addition peaks/dcfBits
+      // So clear both DCFbit displays and start again.
+      // Reset buffer counter
+      bufferPosition = 0;
+      // clear inner LED ring
+      clearRing( LedRingInner );
+      // turn Buffer Overflow Error LED ON
+      error( LED_BUFFEROVERFLOW );
+      return;
+    }
+  } else if ( bufferPosition > 59 ) {
+    // Serial.println("buffer overflow >59");
     // Buffer Overflow ERROR - we have received more pulses before reaching
     // the 2 second 'gap' signalling the end of the minute.
     //This error may be due to a noisy signal giving addition peaks/dcfBits
@@ -476,11 +528,42 @@ void finalizeBuffer( void ) {
   // Now check if it correspondends with the buffer counter
   // 'bufferPosition' which should be value 59
   //--------------------------------------------------------------------
-  if ( lastBufferPosition == 59 && lastDcfValidSignal == true ) {
+  if ( lastBufferPosition == 60 && lastDcfValidSignal == true && leapSecond == 1 && dcfMinute ==59 && leapSecBit == 0 ) {  //Brett Leap Second checks
     // process buffer and extract data sync the time with the RTC
     decodeBufferContents();
     // set Arduino time and after that set RTC time
     setTime( dcfHour, dcfMinute, 0, dcfDay, dcfMonth, dcfYear );
+    #ifdef USE_RTC
+      takeMuxSemaphore();
+      RTC.set(now());
+      giveMuxSemaphore();
+      log_d( "RTC and internal clock adjusted to 20%02d:%02d:%02d %02d:%02d:00", dcfYear, dcfMonth, dcfDay, dcfHour, dcfMinute );
+    #endif
+    // bufferPosition == 59 so turn Buffer Full LED ON
+    LedErrorStatus( LED_BUFFERFULL, HIGH );
+    // Turn DCF OK LED ON
+    LedDCFStatus( true );
+    // copy 'contents' of inner LED ring to the outer LED ring (current time information)
+    for ( uint8_t r = 0; r < 60; r++ ) {//Brett Leap Second (60 bits) over
+      setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1, false );
+      // Reset inner LED ring (incoming time information)
+      setRingLed( LedRingInner, r, false );
+      // Reset array, positions 0-60 (=60 bits)
+      //DCFbitBuffer[r] = 0;
+    }
+    // activate Synced LED
+    LedErrorStatus( LED_RTCSYNC, HIGH );
+    // Reset running buffer
+    //bufferPosition   = 0;
+    // reset flag
+    MinuteMarkerFlag = false;
+  } else if( lastBufferPosition == 59 && lastDcfValidSignal == true ) {// Brett Leap Second changed to else if
+    // process buffer and extract data sync the time with the RTC
+    decodeBufferContents();
+    // set Arduino time and after that set RTC time
+
+    setTime( dcfHour, dcfMinute, 0, dcfDay, dcfMonth, dcfYear );
+  // Serial.println("leap sec error here 01");
     #ifdef USE_RTC
       takeMuxSemaphore();
       RTC.set(now());
@@ -491,13 +574,17 @@ void finalizeBuffer( void ) {
     LedErrorStatus( LED_BUFFERFULL, HIGH );
     // Turn DCF OK LED ON
     LedDCFStatus( true );
+
+    setRingLed( LedRingOuter, 59, false );// Brett leap second clear any left over leap second marks
+    setRingLed( LedRingInner, 59, false );// Brett leap second clear any left over leap second marks
     // copy 'contents' of inner LED ring to the outer LED ring (current time information)
-    for ( uint8_t r = 0; r < 59; r++ ) {
-      setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1, false );
+    for ( uint8_t r = 0; r < 59; r++ ) {//Brett 0 to 58 copied - non Leap Second don't copy leap second mark on 59
+    setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1, false );//copy
       // Reset inner LED ring (incoming time information)
-      setRingLed( LedRingInner, r, false );
+      setRingLed( LedRingInner, r, false );//delete 0-58 LED 59 cleared above
       // Reset array, positions 0-58 (=59 bits)
       //DCFbitBuffer[r] = 0;
+
     }
     // activate Synced LED
     LedErrorStatus( LED_RTCSYNC, HIGH );
@@ -514,7 +601,7 @@ void finalizeBuffer( void ) {
     LedErrorStatus( LED_MINUTEMARKER, HIGH );
     log_w( "Minute Mark" );
     // Clear displays
-    for (int i = 0; i < 59; i++) {
+    for (int i = 0; i < 60; i++) {
       // Reset inner LED ring (incoming time information)
       setRingLed( LedRingInner, i, false );
     }
@@ -531,11 +618,10 @@ void finalizeBuffer( void ) {
 void copyBuffer() {
   lastBufferPosition = bufferPosition;
   lastDcfValidSignal = dcfValidSignal;
-  for( uint8_t i=0;i<59;i++ ) {
+  for( uint8_t i=0;i<60;i++ ) {
     DCFbitFinalBuffer[i] = DCFbitBuffer[i]; // here, the received DCFbits are stored copyBuffer()
   }
 }
-
 
 
 //================================================================================================================
@@ -566,6 +652,7 @@ void decodeBufferContents( void ) {
   leapYear   = calculateLeapYear( dcfYear );
   #ifdef DCF77_DO_WEATHER
     // store weather info (needs three records in a row to decode)
+    dcfWeatherDecodeStatus = 1;
     if ( addToWeatherInfo( DCFbitFinalBuffer ) ) {
       mWeatherArea = getArea();
       mWeatherSection = getSection();
@@ -592,11 +679,13 @@ void decodeBufferContents( void ) {
         }
         weatherReady = true;
       } else {
-        log_w("weather data couldn't be decrypted/uncompressed");
+        //log_w("weather data couldn't be decrypted/uncompressed");
+        dcfWeatherDecodeStatus = -1;
       }
     } else {
-      log_w("weather data not complete yet");
+      //log_w("weather data not complete yet");
     }
+    dcfWeatherBitNum = dcfMinute%3;
   #endif
 }
 

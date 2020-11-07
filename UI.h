@@ -1,15 +1,6 @@
 #ifndef _UI_H_
 #define _UI_H_
 
-
-void touchLoop();
-void touchCalibrate();
-//#include <XPT2046_Touchscreen.h>
-#define TOUCH_CS 21 // enable touch
-#define TOUCH_FREQ 20000000
-
-//XPT2046_Touchscreen ts(TOUCH_CS);
-
 //#define LGFX_ONLY
 
 #ifndef LGFX_ONLY
@@ -17,19 +8,15 @@ void touchCalibrate();
   // using ESP32-Chimera-Core device list
 
   //#define LGFX_ONLY
-  #undef LGFX_AUTODETECT
-  #define LGFX_LOLIN_D32_PRO
+  //#undef LGFX_AUTODETECT
+  //#define LGFX_LOLIN_D32_PRO
   #include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
   #define tft M5.Lcd // syntax sugar
-  #define Display320x240 // warn: 320x240 frame buffer may exceed available ram, use tft.setColorDepth( 8 )
+  //#define Display320x240 // warn: 320x240 frame buffer may exceed available ram, use tft.setColorDepth( 8 )
 
 
   void M5Begin()
   {
-
-    #ifdef TOUCH_CS
-    M5.setTouchSpiShared( TOUCH_CS ); // call this before M5.begin() !!
-    #endif
 
     if( SERIAL_SPEED != 115200 ) {
       M5.begin(true, SD_ENABLE, false);
@@ -38,23 +25,10 @@ void touchCalibrate();
       M5.begin();
     }
 
-    tft.drawRect(10,10,20,20,0xFFFF);
-    tft.print("BLAH");
-    delay(1000);
+    NVSUtils nvsUtils;
 
-    #ifdef TOUCH_CS
-    if( M5.ts == nullptr ) {
-      Serial.println("No touch mounted, aborting");
-      while(1);
-    }
-
-    uint16_t calData[5] = { 808, 2241, 599, 3448, 0 };
-    tft.setTouch(calData);
-
-    while(1) {
-      touchLoop();
-    }
-    #endif
+    //nvsUtils.dumpNVS("AUTODETECT");
+    //nvsUtils.nvsdump( nullptr );
 
   }
 
@@ -63,7 +37,7 @@ void touchCalibrate();
 
   // bypassing LovyanGFX device detection
 
-  #include <LovyanGFX.hpp>
+  #include <LGFX_TFT_eSPI.hpp>
   #include <Wire.h>
 
   // Custom SD config
@@ -73,7 +47,7 @@ void touchCalibrate();
   #define TFCARD_CS_PIN 13  // edit if necessary
   //#define DisplayPanel lgfx::Panel_ST7735S
   #define DisplayPanel lgfx::Panel_ILI9341
-  #define Display320x240
+  //#define Display320x240
 
   // custom TFT config
   struct LGFX_Config
@@ -164,13 +138,6 @@ void touchCalibrate();
 
     tft.clearScreen();
 
-    touchCalibrate();
-
-
-    while(1) {
-      touchLoop();
-    }
-
     #if defined ( USE_TFCARD_CS_PIN ) && defined( TFCARD_CS_PIN )
 
       log_d("Enabling SD from TFCARD_CS_PIN (%d)", TFCARD_CS_PIN);
@@ -191,103 +158,7 @@ void touchCalibrate();
 
   }
 
-
 #endif
-
-
-
-#ifdef TOUCH_CS
-// Code to run a screen calibration, not needed when calibration values set in setup()
-void touchCalibrate()
-{
-  uint16_t calData[5];
-  uint8_t calDataOK = 0;
-
-  // Calibrate
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(20, 0);
-  tft.setTextFont(2);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  tft.println("Touch corners as indicated");
-
-  tft.setTextFont(1);
-  tft.println();
-
-  tft.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
-
-  Serial.println(); Serial.println();
-  Serial.println("// Use this calibration code in setup():");
-  Serial.print("  uint16_t calData[5] = ");
-  Serial.print("{ ");
-
-  for (uint8_t i = 0; i < 5; i++)
-  {
-    Serial.print(calData[i]);
-    if (i < 4) Serial.print(", ");
-  }
-
-  Serial.println(" };");
-  Serial.print("  tft.setTouch(calData);");
-  Serial.println(); Serial.println();
-
-  tft.fillScreen(TFT_BLACK);
-
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.println("Calibration complete!");
-  tft.println("Calibration code sent to Serial port.");
-
-  delay(4000);
-}
-
-boolean wastouched = true;
-void touchLoop()
-{
-  boolean istouched = M5.ts->touched();
-  if (istouched) {
-    TS_Point p = M5.ts->getPoint();
-
-    p.x = map(p.x, 540, 3200, 0, tft.width() );
-    p.y = map(p.y, 196, 4096, 0, tft.height() );
-
-    if (!wastouched) {
-      //tft.print("Touchstart");
-    }
-
-    if( p.z > 200 ) {
-      tft.fillCircle( p.x, p.y, 3, TFT_WHITE );
-      Serial.printf("x = %4d, y = %4d, z = %4d\n", p.x, p.y, p.z );
-    } else {
-      // false positive reading
-    }
-
-
-  } else {
-    if (wastouched) {
-      //tft.print("Touchend");
-    }
-    //Serial.println("no touch");
-  }
-  wastouched = istouched;
-  delay(15);
-}
-
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -297,6 +168,8 @@ void touchLoop()
 
 #ifdef DCF77_DO_WEATHER
   #include <Preferences.h>
+  //#include "NVS.h"
+  #include "nvs_flash.h"
   Preferences prefs;
   static int maxEntriesPerPage = 10;
   static int entriesIndex = -1;
@@ -304,7 +177,8 @@ void touchLoop()
   static unsigned long pickerTimeout = 5000;
   static unsigned long beforePicking = millis();
   String preferredCountry = "";
-  String preferredCity = "";
+  String preferredCity    = "";
+
 #endif
 
 #ifdef USE_RTC
@@ -314,7 +188,7 @@ void touchLoop()
   #include <Time.h>
 #endif
 
-#ifdef SPEAKER_PIN
+#ifdef USE_SPEAKER
   SPEAKER Speaker;
 #endif
 
@@ -363,16 +237,37 @@ struct BoxStyle
 
 
 // helper for setFontStyle
+void setTextStyle( M5Display *_tft, TextStyle *style )
+{
+  lgfx::TextStyle myStyle; // why no constructor ??
+  myStyle.fore_rgb888 = style->fore_rgb888;
+  myStyle.back_rgb888 = style->back_rgb888;
+  myStyle.size_x      = style->size_x;
+  myStyle.size_y      = style->size_y;
+  myStyle.datum       = style->datum;
+  myStyle.utf8        = style->utf8;
+  myStyle.cp437       = style->cp437;
+  _tft->setTextStyle( myStyle );
+}
+
+void setFontStyle( M5Display *_tft, FontStyle *myFontStyle )
+{
+  _tft->setFont( myFontStyle->font );
+  setTextStyle( _tft, myFontStyle->style );
+}
+
+
+// helper for setFontStyle
 void setTextStyle( TFT_eSprite *sprite, TextStyle *style )
 {
   lgfx::TextStyle myStyle; // why no constructor ??
   myStyle.fore_rgb888 = style->fore_rgb888;
   myStyle.back_rgb888 = style->back_rgb888;
-  myStyle.size_x = style->size_x;
-  myStyle.size_y = style->size_y;
-  myStyle.datum = style->datum;
-  myStyle.utf8 = style->utf8;
-  myStyle.cp437 = style->cp437;
+  myStyle.size_x      = style->size_x;
+  myStyle.size_y      = style->size_y;
+  myStyle.datum       = style->datum;
+  myStyle.utf8        = style->utf8;
+  myStyle.cp437       = style->cp437;
   sprite->setTextStyle( myStyle );
 }
 
@@ -383,12 +278,14 @@ void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle )
 }
 
 
-
-#if defined( ARDUINO_M5Stack_Core_ESP32 ) || defined( ARDUINO_M5STACK_FIRE ) || defined( Display320x240 )
+#if defined UI_320x240
   #include "UI_320x240.h"
-#else
+#elif defined UI_160x128
   #include "UI_160x128.h"
+#else
+  #error "Please define either UI_320x240 or UI_160x128"
 #endif
+
 
 #include "DCF77.h"
 
@@ -498,7 +395,9 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
 #include "Tasks.h"
 
 
-#if defined( BUTTON_A_PIN ) &&  defined( BUTTON_B_PIN ) &&  defined( BUTTON_C_PIN )
+#if defined USE_BUTTONS
+
+  #if defined( BUTTON_A_PIN ) &&  defined( BUTTON_B_PIN ) &&  defined( BUTTON_C_PIN )
 
   void checkButtons()
   {
@@ -551,8 +450,30 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
     //delay(50);
   }
 
+  #else
+    // TODO: implement touch or other input methods
+  #endif
+
+
 #else
-  void checkButtons() { ; }
+
+  void checkSerial()
+  {
+    if( Serial.available() ) {
+      String respStr = Serial.readStringUntil('\n');
+      int resp = respStr.toInt();
+      if( resp < 0 || resp > citiesLength ) {
+        Serial.println("Invalid entry, please provide the City ID, not the name");
+        pickerTimeout = 600000;
+        beforePicking = millis();
+      } else {
+        Serial.printf("Selecting city #%d ( %s / %s", resp, cities[resp].country.name, cities[resp].name );
+        entriesIndex = resp;
+        pickedCity = true;
+      }
+    }
+  }
+
 #endif
 
 
@@ -682,10 +603,10 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
     giveMuxSemaphore();
 
     takeMuxSemaphore();
-    MaskSprite.pushImage( 0, -tft.height() / 2 + scrollHeight / 2, tft.width(), tft.height(), (const uint16_t*)sprite.frameBuffer(1), TFT_BLACK );
+    MaskSprite.pushImage( 0, -tft.height() / 2 + scrollHeight / 2, tft.width(), tft.height(), (const uint16_t*)sprite.frameBuffer(1)/*, TFT_BLACK*/ );
     //MaskSprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
     //MaskSprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
-    MaskSprite.pushRotated( &ScrollSprite, 0, TFT_BLACK );
+    MaskSprite.pushRotated( &ScrollSprite, 0/*, TFT_BLACK*/ );
     //MaskSprite.pushRotatedHP( &ScrollSprite, 0, TFT_BLACK );
 
     //ScrollSprite.pushImage( 0, 0, MaskSprite.width(), MaskSprite.height(), (const uint16_t*)MaskSprite.frameBuffer(1) );
@@ -693,7 +614,7 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
     giveMuxSemaphore();
 
     takeMuxSemaphore();
-    MainSprite.pushImage( 0, tft.height() / 2 - scrollHeight / 2, tft.width(), scrollHeight, (const uint16_t*)ScrollSprite.frameBuffer(1), TFT_BLACK );
+    MainSprite.pushImage( 0, tft.height() / 2 - scrollHeight / 2, tft.width(), scrollHeight, (const uint16_t*)ScrollSprite.frameBuffer(1)/*, TFT_BLACK*/);
     giveMuxSemaphore();
     scrollPos -= scrollSpeed;
     if ( scrollPos <= -scrollWidth ) {
@@ -713,14 +634,14 @@ void displayBufferPosition( int dcfBit )
 
   setFontStyle( &sprite, LedDisplayFontStyle );
   w = sprite.textWidth( "0" );
-  sprite.setTextColor( TFT_RED, TFT_DARKGRAY );
+  sprite.setTextColor( TFT_RED, TFT_BLACK );
   sprite.drawString( dcfBit ? "1" : "0", tft.width() - w, LedDisplayFontHeight + 2 );
 
   char bufferPosStr[3];
   sprintf( bufferPosStr, "%02d", bufferPosition );
   w = sprite.textWidth( "000" );
-  sprite.setTextColor( TFT_GREEN, TFT_DARKGRAY );
-  sprite.drawString( bufferPosStr, tft.width() - (w + 1), LedDisplayFontHeight + 1 );
+  sprite.setTextColor( TFT_GREEN, TFT_BLACK );
+  sprite.drawString( bufferPosStr, tft.width() - (w + 10), LedDisplayFontHeight + 2 );
 
   giveMuxSemaphore();
 }
@@ -741,9 +662,9 @@ void LedDisplay( int addr, String leftOrRight, int value )
         case 4: // Right
           LedDisplayFontStyle->setTextStyle( LedDisplayStylePingtime );
           setFontStyle( &sprite, LedDisplayFontStyle );
-          w = sprite.textWidth( "0000000" );
-          sprintf( pulseStr, "%4d", value );
-          xpos = tft.width() - (w + 1);
+          w = sprite.textWidth( "00000000" );
+          sprintf( pulseStr, "%4d ", value );
+          xpos = tft.width() - w;
         break;
         case 0: // Left
           LedDisplayFontStyle->setTextStyle( LedDisplayStyleLeftover );
@@ -761,12 +682,12 @@ void LedDisplay( int addr, String leftOrRight, int value )
       {
         char errorStr[12];
         if (value > 99) value = 99;
-        sprintf( errorStr, "E:%02d", value );
+        sprintf( errorStr, "E: %02d", value );
         ErrorsCountFontStyle->setTextStyle( (value==0) ? ErrorsCountStyleOK : ErrorsCountStyleKO );
         setFontStyle( &sprite, ErrorsCountFontStyle );
         w = sprite.textWidth( errorStr  );
         sprite.fillRect( tft.width() - (w + 3), ErrorsCountFontHeight * 2 + 2, w + 2, ErrorsCountFontHeight + 1, TFT_DARKGRAY );
-        sprite.drawString( errorStr, tft.width() - (w + 2), ErrorsCountFontHeight * 2 + 2 );
+        sprite.drawString( errorStr, tft.width() - w, ErrorsCountFontHeight * 2 + 3 );
       }
     break;
     default:
@@ -808,9 +729,9 @@ void LedParityStatus( byte paritynum, int status )
   //uint16_t color;
 
   switch ( paritynum ) {
-    case 1: out = "M"; break;
-    case 2: out = "S"; xpos = 12; break;
-    case 3: out = "D"; xpos = 24; break;
+    case 1: out = "Min";  xpos = MHDXPos[0]; break;
+    case 2: out = "Hr";   xpos = MHDXPos[1]; break;
+    case 3: out = "Date"; xpos = MHDXPos[2]; break;
     default: log_d( "invalid paritynum: %d", paritynum ); return;
   }
   switch (status) {
@@ -906,6 +827,66 @@ void LedErrorStatus( byte lednum, int status )
 }
 
 
+void LeapSecondWarning() {
+  takeMuxSemaphore();
+  //TODO: manage coordinates and text styles from 320x240 and 160x128 profiles
+  sprite.setTextColor(TFT_RED, TFT_BLACK);//Brett
+  sprite.setCursor (105, 95);//Brett  across then down
+  sprite.print("Leap Sec Inserted"); // This uses the standard ADAFruit small font  //Brett
+
+  // record date of last Leap Second on TFT
+  sprite.setTextColor(TFT_BLACK, TFT_BLACK);//Brett
+  sprite.setCursor (0, 170);//Brett  across then down
+  sprite.print("        "); // This uses the standard ADAFruit small font  //Brett
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
+  sprite.setCursor (0, 170);//Brett  across then down
+  sprite.print("Leap Sec"); // This uses the standard ADAFruit small font  //Brett
+
+  sprite.setTextColor(TFT_BLACK, TFT_BLACK);//Brett
+  sprite.setCursor (0, 180);//Brett  across then down
+  sprite.print("        "); // This uses the standard ADAFruit small font  //Brett
+
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
+  sprite.setCursor (0, 180);//Brett  across then down
+  sprite.print(hour()); // This uses the standard ADAFruit small font  //Brett
+  sprite.setCursor (12, 180);//Brett  across then down
+  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
+  sprite.setCursor (18, 180);//Brett  across then down
+  sprite.print(minute()); // This uses the standard ADAFruit small font  //Brett
+  sprite.setCursor (30, 180);//Brett  across then down
+  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
+  sprite.setCursor (36, 180);//Brett  across then down
+  sprite.print(bufferPosition +1); // This uses the standard ADAFruit small font  //Brett
+
+  sprite.setTextColor(TFT_BLACK, TFT_BLACK);//Brett
+  sprite.setCursor (0, 190);//Brett  across then down
+  sprite.print("          "); // This uses the standard ADAFruit small font  //Brett
+
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
+  sprite.setCursor (0, 190);//Brett  across then down
+  sprite.print(day()); // This uses the standard ADAFruit small font  //Brett
+
+
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
+  sprite.setCursor (12, 190);//Brett  across then down
+  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
+
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
+  sprite.setCursor (18, 190);//Brett  across then down
+  sprite.print(month()); // This uses the standard ADAFruit small font  //Brett
+
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
+  sprite.setCursor (30, 190);//Brett  across then down
+  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
+
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
+  sprite.setCursor (36, 190);//Brett  across then down
+  sprite.print(year()); // This uses the standard ADAFruit small font  //Brett
+  giveMuxSemaphore();
+}
+
+
+
 static const char weekStr[] = "SMTWTFS";
 
 void drawWeekDays( int daynum )
@@ -921,7 +902,7 @@ void drawWeekDays( int daynum )
   int boxCenterX = boxWidth/2 - margin;
   int boxCenterY = boxHeight/2 + margin*2;
 
-  hpos -= (boxWidth*7);
+  hpos -= (boxWidth*7); // right aligned
   vpos -= (boxHeight);
 
   setFontStyle( &sprite, LedWeekStatusFontStyle );
@@ -941,11 +922,64 @@ void drawWeekDays( int daynum )
       }
       sprite.setTextColor( TFT_GRAY );
     }
-    sprite.drawChar( weekStr[pos],  hpos+boxCenterX, vpos+boxCenterY );
+    sprite.drawChar( weekStr[pos],  hpos+boxCenterX+LedWeekStatusMarginX, vpos+boxCenterY+LedWeekStatusMarginY );//Brett move weekday text left right -x   down and up -y
     hpos += boxWidth;
   }
 
 }
+
+
+#ifdef DCF77_DO_WEATHER
+
+static const char weatherBitsStatusStr[] = "123";
+
+static const String weatherBitsStr[3] = { "110", "101", "011" };
+
+void LedWeatherStatus( int bitnumber, int bitstatus, bool echo = true )
+{
+
+  int bitposition = 0;
+
+  setFontStyle( &sprite, LedWeekStatusFontStyle );
+
+  switch( bitnumber ) {
+    case 0: bitposition = 2; if( echo ) Serial.println( "Received Meteo Bits 29-42" ); break;
+    case 1: bitposition = 0; if( echo ) Serial.println( "Received Meteo Bits 01-14" );  break;
+    case 2: bitposition = 1; if( echo ) Serial.println( "Received Meteo Bits 15-28" ); break;
+    default: log_e("Invalid meteo bit index !!"); return;
+  }
+
+  switch( bitstatus ) {
+    case -1: sprite.setTextColor( TFT_RED ); if( echo ) log_w("weather data couldn't be decrypted/uncompressed"); break;
+    case  0: sprite.setTextColor( TFT_GRAY );/* grey */ break;
+    case  1: sprite.setTextColor( TFT_GREEN );/* green */ break;
+    default: log_e("Invalid meteo bit status !!");
+  }
+
+  int hpos = 0; // left aligned
+  int vpos = sprite.height(); // bottom aligned
+  int margin = 1;
+
+  for( int i=0;i<3;i++) {
+    getTextBounds( &sprite, weatherBitsStr[i].c_str(), &tmpFontWidth, &tmpFontHeight );
+    int boxCenterX = /*(tmpFontWidth/2)+*/margin;
+    int boxCenterY = (tmpFontHeight/2)-margin;
+    if( bitposition == 0 ) {
+      // resetting, process all
+      sprite.drawString( weatherBitsStr[i], hpos+boxCenterX, (vpos-tmpFontHeight)+boxCenterY );
+      if( i==0 ) sprite.setTextColor( TFT_GRAY );
+    } else {
+      // updating, process one
+      if( bitposition == i ) sprite.drawString( weatherBitsStr[i], hpos+boxCenterX, (vpos-tmpFontHeight)+boxCenterY );
+    }
+    hpos += tmpFontWidth;
+  }
+
+}
+
+#endif
+
+
 
 void LedWeekStatus( int weekDay, int status )
 {
@@ -1188,8 +1222,8 @@ void error( int errorLed )
 void displayRtcTime()
 {
   //byte fontAscent = 5;
-  char timeStr[9];
-  sprintf( timeStr, "%02d:%02d:%02d", hour(), minute(), second() );
+  char timeStr[16];
+  sprintf( timeStr, TIME_FORMAT, hour(), minute(), second() );
   takeMuxSemaphore();
   setFontStyle( &sprite, myRTCTimeFontStyle );
   sprite.drawString( timeStr, TFT_HALFWIDTH, RTCTimeYPos );
@@ -1200,8 +1234,8 @@ void displayRtcTime()
 
 void displayRtcDate()
 {
-  char dateStr[11];
-  sprintf( dateStr, "%04d-%02d-%02d", year(), month(), day() );
+  char dateStr[16];
+  sprintf( dateStr, DATE_FORMAT, year(), month(), day() );
   takeMuxSemaphore();
   setFontStyle( &sprite, myRTCDateFontStyle );
   sprite.drawString( dateStr, TFT_HALFWIDTH, RTCDateYPos );
@@ -1217,7 +1251,7 @@ void displayRtcDate()
 }
 
 
-#ifdef SPEAKER_PIN
+#ifdef USE_SPEAKER
   void marioIntro()
   {
     //Mario main theme short intro
@@ -1247,7 +1281,7 @@ void displayRtcDate()
 
 void scheduleBuzz( uint16_t note, int duration )
 {
-  #ifdef SPEAKER_PIN
+  #ifdef USE_SPEAKER
     willBuzzNote = note;
     willBuzzDuration = duration;
   #endif
@@ -1319,22 +1353,30 @@ void scheduleBuzz( uint16_t note, int duration )
   {
     #ifndef USE_BUTTONS
       // TODO: handle serial input instead of blaming the lack of HID
-      log_e("This feature requires buttons!");
-      return;
+      log_n("Please find your preferred city and enter the number");
+      //return;
     #endif
     maxEntriesPerPage = tft.height() / RTCDateFontHeight;
     halfPage = maxEntriesPerPage / 2;
     log_d("maxEntriesPerPage / citiesLength / halfPage : %d / %d / %d", maxEntriesPerPage, citiesLength, halfPage);
     for( int i=0; i<citiesLength; i++ ) {
-      log_d("Index / Country / City: %d / %s / %s",  i, cities[i].country.name, cities[i].name );
+      #ifndef USE_BUTTONS
+        log_n("[%2d] %s / %s",  i, cities[i].country.name, cities[i].name );
+      #else
+        log_d("Index / Country / City: %d / %s / %s",  i, cities[i].country.name, cities[i].name );
+      #endif
     }
     UIMode = DCF_SETUP;
     beforePicking = millis();
     //bool has_timed_out = false;
     pickerTimeout = timeout;
     while( !pickedCity ) {
-      checkButtons();
-      paginateCities();
+      #ifndef USE_BUTTONS
+        checkSerial();
+      #else
+        checkButtons();
+        paginateCities();
+      #endif
       if( beforePicking + pickerTimeout < millis() ) {
         //has_timed_out = true;
         break;
@@ -1345,9 +1387,12 @@ void scheduleBuzz( uint16_t note, int duration )
       // save only if choice changed
       log_w("Prefs have changed, clearing/saving!");
 
+      /*
       prefs.begin("DCF77WData", false);
       prefs.clear();
       prefs.end();
+      */
+      //esp_err_t result = nvs_flash_erase();
 
       prefs.begin("DCF77Prefs", false);
       prefs.clear();
@@ -1366,12 +1411,17 @@ void scheduleBuzz( uint16_t note, int duration )
   void InitPrefs()
   {
 
-    prefs.begin("DCF77Prefs", true);
-    preferredCountry = prefs.getString("country");
-    preferredCity    = prefs.getString("city");
-    prefs.end();
-
+    #if defined FORCED_WATCHED_CITY && defined FORCED_WATCHED_COUNTRY
+      preferredCountry = String( FORCED_WATCHED_COUNTRY );
+      preferredCity    = String( FORCED_WATCHED_CITY );
+    #else
+      prefs.begin("DCF77Prefs", true);
+      preferredCountry = prefs.getString("country");
+      preferredCity    = prefs.getString("city");
+      prefs.end();
+    #endif
     //citiesLength = ( sizeof(cities) / sizeof(cityByCountry) ) -1;
+
 
     if( preferredCountry != "" ) {
       log_w("Found preferredCountry '%s' in NVS, will compare with local list", preferredCountry.c_str() );
@@ -1387,7 +1437,12 @@ void scheduleBuzz( uint16_t note, int duration )
             for( int i=0; i<citiesLength; i++ ) {
               if( strcmp( prefcity, cities[i].name )==0 && strcmp( country->name, cities[i].country.name )==0 ) {
                 entriesIndex = i;
-                CountryCityWizard( 5000 );
+                #if defined FORCED_WATCHED_CITY && defined FORCED_WATCHED_COUNTRY
+                  CountryCityWizard( 100 );
+                #else
+                  CountryCityWizard( 5000 );
+                #endif
+
                 log_w("Free heap before weather data memory allocation: %d", ESP.getFreeHeap() );
                 initWeatherForecastCache();
                 initMyCityForecastsCache();
@@ -1427,7 +1482,7 @@ void InitPins()
 
 void initSpeaker()
 {
-  #ifdef SPEAKER_PIN
+  #ifdef USE_SPEAKER
     // TONE
     Speaker.begin();
     Speaker.setVolume( 2 );
@@ -1469,7 +1524,18 @@ static void InitUI()
 {
   tft.clear();
   tft.setRotation( displayRotation );
+
   tft.fillScreen( TFT_BLACKISH );
+
+  //morphSprite();
+
+  tft.fillScreen( TFT_BLACKISH );
+
+  if( tft.width()>=320 ) {
+    if( psramInit() ) {
+      //sprite.setPsram( true );
+    }
+  }
 
   uint16_t* spritePtr = (uint16_t*)sprite.createSprite( tft.width(), tft.height() );
   if( spritePtr == NULL ) {
@@ -1532,11 +1598,23 @@ static void InitUI()
   LogoSprite.fillSprite( TFT_BLACKISH );
 
   setFontStyle( &sprite, LedParityStatusFontStyle );
-  getTextBounds( &sprite, "01100101 P", &tmpFontWidth, &tmpFontHeight );
+  getTextBounds( &sprite, "011001010 P", &tmpFontWidth, &tmpFontHeight );
   sprite.fillRect( 0,                                       tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
   sprite.fillRect( tmpFontWidth - LedParityStatusFontWidth, tft.height() - (LedParityStatusFontHeight + 2), LedParityStatusFontWidth + 2,            LedParityStatusFontHeight+1, TFT_ORANGE);
   sprite.setTextColor( TFT_DARKGRAY );
-  sprite.drawString( "01100101 P", 1, tft.height() - (LedParityStatusFontHeight + 1)  );
+  sprite.drawString( "011001010 P", 1, tft.height() - (LedParityStatusFontHeight + 1)  );
+  #ifdef DCF77_DO_WEATHER
+    // clear area from dummy text
+    sprite.fillRect( 0,                                       tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
+  #endif
+
+/*
+  sprite.setCursor( 1, tft.height() - (LedParityStatusFontHeight + 1 ) );
+  sprite.setTextColor( TFT_DARKGRAY, TFT_LIGHTGRAY );
+  sprite.print("01100101 ");
+  sprite.setTextColor( TFT_DARKGRAY, TFT_ORANGE );
+  sprite.print("P");
+*/
 
   LedParityStatus( 1, -1 ); // H
   LedParityStatus( 2, -1 ); // M
@@ -1601,6 +1679,9 @@ void displayData( void )
     dcfWeekDay,
     weekNumber
   );
+  #ifdef DCF77_DO_WEATHER
+    LedWeatherStatus( dcfWeatherBitNum, dcfWeatherDecodeStatus );
+  #endif
 }
 
 
@@ -1644,30 +1725,42 @@ void LedTest()
   LedWeekStatus( LED_WEEKNUMBER, -1 );
   drawWeekDays( -1 );
   sprite.pushSprite( 0, 0, TFT_BLACK );
+
+  #ifdef DCF77_DO_WEATHER
+    for( int e=-1; e<2; e++ ) {
+      for( int i=1; i<4; i++ ) {
+        LedWeatherStatus( i%3, e, false );
+        sprite.pushSprite( 0, 0, TFT_BLACK );
+        delay(10);
+      }
+      delay(20);
+    }
+    LedWeatherStatus( 1, 0, false );
+    sprite.pushSprite( 0, 0, TFT_BLACK );
+  #endif
+
+
 }
 
 
 void initialize(void)
 {
-  /*
-  if( SERIAL_SPEED != 115200 ) {
-    M5.begin(true, SD_ENABLE, false);
-    Serial.begin( SERIAL_SPEED );
-  } else {
-    M5.begin();
-  }*/
+
   M5Begin();
   Serial.printf("Started serial at %d bauds\n", SERIAL_SPEED);
+
+  #if defined tftBrightness
+    tft.setBrightness(tftBrightness);
+  #endif
+
+  //M5.NVS.Dump();
+  //M5.NVS.Erase();
 
   InitPins();
   InitUI();
 
-  leadingEdge         = 0;
-  trailingEdge        = 0;
-  previousLeadingEdge = 0;
-  bufferPosition      = 0;
-  // Reset DCFbitBuffer array, positions 0-58 (=59 bits)
-  for ( int i = 0; i < 59; i++ ) {
+  // Reset DCFbitBuffer array, positions 0-59 (=60 bits)
+  for ( int i = 0; i < 60; i++ ) {
     DCFbitBuffer[i] = 0;
     DCFbitFinalBuffer[i] = 0;
   }
@@ -1679,6 +1772,13 @@ void initialize(void)
   }
   // activate errorCounter display after LED test
   LedDisplay( DisplayBufferBitError, "R", 0 );
+
+  // reset timers
+  leadingEdge         = millis();
+  trailingEdge        = millis();
+  previousLeadingEdge = millis()-1000;
+  bufferPosition      = second()+1; // attempt to recover position from RTC
+
   // spawn tasks
   initTasks();
 }

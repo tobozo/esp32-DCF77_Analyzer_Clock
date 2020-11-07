@@ -71,8 +71,90 @@
     - Erik de Ruiter's Github : https://github.com/deruiter
     - FroggySoft's Github     : https://github.com/FroggySoft
 
-*/
+  Improvements by Brett Oliver (http://www.brettoliver.org.uk/):
 
+    - Analyzer output works on 2.2" & 2.8" Touch ILI9341 TFT via a Lolin D32 Pro v2 board.
+    - Serial ouput Modified to work on a TFT serial monitor
+    - working version 01
+    - Test version 02
+      Brett Oliver's notes
+      Had to add #include <TimeLib.h> to DS1307RTC.h tab to prevent complile errors
+      Complies LOLIN D32 PRO and TTGO T1
+
+      Changed ESP32 to transmit serial at 9600 to work better on my serial monitor.
+      config tab #define SERIAL_SPEED 9600
+
+      Have changed UI.h
+      panel.panel_width to 240 from 320 and panel.panel_height to 320 from 240(prob the wrong place to change it ran out of time must be a rotation setting somewhere?)
+    - v3
+    - v4
+      Timestamp-DCF77.h line 340 timestamp evey complete minute decode
+      DCF77_Weather Line 1562 Brett2
+      from Serial.println("City match, should update scroll and icons !!");
+      to  Serial.println("City match, weather icons on");//Brett2
+      DCF77_Weather Line 1566
+      from Serial.println("Forecast for this country+city will not be displayed");
+      to Serial.println("No City match, weather icons off");//Brett3
+      DCF77_Weather H line 1534
+      from  sprintf( str, "twoday f/c day = %d ", (((dcfHour - 21) * 60 + dcfMinute) > 90) ? 2 : 1); Serial.println( str );
+      to sprintf( str, "twoday f/c day = %d ", (((dcfHour - 23) * 60 + dcfMinute) > 90) ? 2 : 1); Serial.println( str );
+      Change Great Britain to UK
+      Modify Serial output for TFT serial monitor display
+    - v6
+      UI.h added lin to show time every minute of Meteo Data decode
+      DCFweather line 101 changed clouded to cloudy
+
+      374  Serial.println("Minute Parity P1 Pass");//Brett
+      383 Serial.println("Minute Parity P1 Fail");//Brett
+      400 Serial.println("Hour Parity P2 Pass");//Brett
+      409 Serial.println("Hour Parity P2 Fail");//Brett
+      428 Serial.println("Date Parity P3 Pass");//Brett
+      437 Serial.println("Date Parity P3 Fail");//Brett
+      464 Serial.println("Error Buffer Overflow");//Brett
+      501 Serial.println("DCF77 Time decode correct");//Brett
+
+
+    - v7 change fonts U320x240 font styles changed from picopixels
+    - v8 miss out
+    - v9 adding DCF77 decode progress to serial terminal  DCFWeather.H  Serial.println("Received Meteo Data 1-14"); etc
+      remove serial.print sig weather DCF77 weather.h void printPrefsCache()
+      line 565 UI.h //Brett add space between buffer number and DCF bit value
+      line 589 UI.h // Brett creates space between period time and pulse indicators on TFT
+      line 89 etc UI320 240 remove hi-light from Week no,LEAP, CEST and CET to make txt green if on and black if off
+    - v10 corrected weekday text //Brett UI.h 795 move weekday text left right -x   down and up -y
+    - v11 adding switches and DCFWEATHER line 1605 set watched city manually
+      //Brett DCF Weather.h line 1597 manual setting of watched city
+      Serial.print("Watched city detected ");//Brett
+        Serial.println(watchedCity);//Brett
+      Serial.print("Watched city is set to ");//Brett
+        Serial.println(watchedCity);//Brett
+
+      v10 add watched location to TFT
+      DCF77 weather.h  line 1621 prints watchewd city name on the TFT
+      v11 add println to day critical waether DCW etc DCF77weather.h line 1511 etc
+      continue changing location of watched location DCF77 weather.h  line 1621 prints watchewd city name on the TFT
+    - v12 parity M S D re-positioned
+    - v13  21:00 & 22:00 hr crash fix ( Modified nowweather()) working
+    - v14 etc miss
+    - v15 to stop crash on receipt of all 42 bits weather data (some LOLIN D32 Pros only)
+      comment out this line in DCF77.h => setForecast( forecastID, forecastHour, forecastMinute, aInfo );
+    - v16 void
+    - v17/v18 added receive bits info to TFT display to show what data is being received
+        added after line203 task.h
+    - v19 add leap second detection not working yet
+      if leapSec == 1,sec == 59 ,min == 59 buffer ==59
+      in DCF77.h 366
+      dcfDST     = bitDecode( DCFbitFinalBuffer, 17, 17 ); checks for summertime
+
+    - v20 continue leap second detection leap second works but does not show 60 seconds.
+    - v21 miss out
+    - v22 miss out
+    - v23 continue leap second does not show 60 sec on leap second RTC issue?
+    - v24 leap year clean up and display clean up of leap second bits
+    - v25 display leap second inserted on TFT
+    - v26 record Leap Sec time and date on TFT
+
+*/
 
 #include "Config.h"
 #include "UI.h" // TFT Support for Clock Analyzer + JPEG/Adafruit layer

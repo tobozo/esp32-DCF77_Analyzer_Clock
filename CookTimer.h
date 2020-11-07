@@ -149,7 +149,7 @@ void drawTimer( uint16_t posx, uint16_t posy ) {
 
 
 void timerSound() {
-  #ifdef SPEAKER_PIN
+  #ifdef USE_SPEAKER
   for(uint16_t i=100;i<5000;i+=2) {
     Speaker.tone(5000-i, 50);
   }
@@ -214,14 +214,14 @@ void pokeCounterAccel() {
 void cookTimerloop() {
 
   switch(CookTimerButtonPos) {
-    case BUTTON_RIGHT:
+    case BUTTON_LEFT:
       if(maxTime+potincrement<=36000) {
         maxTime +=potincrement;
         pokeCounterAccel();
       }
       millistart = millis();
     break;
-    case BUTTON_LEFT:
+    case BUTTON_RIGHT:
       if(maxTime>potincrement && maxTime-potincrement>0) {
         maxTime -=potincrement;
         pokeCounterAccel();
@@ -264,11 +264,13 @@ void cookTimerloop() {
             currentTime = tmpTime;
           }
 
+          /*
           Serial.print(maxTime);
           Serial.print("\t");
           Serial.print(counterOffset);
           Serial.print("\t");
           Serial.println(currentTime);
+          */
 
           if(counterOffset>=maxTime) {
             // ring, ring
@@ -278,7 +280,7 @@ void cookTimerloop() {
             drawTimer( sprite.width()/2, RTCDateYPos );
 
             do {
-              #ifdef SPEAKER_PIN
+              #ifdef USE_SPEAKER
                 for(uint16_t i=100;i<5000;i+=4) {
                   Speaker.tone(i, 30);
                   vTaskDelay(1);
