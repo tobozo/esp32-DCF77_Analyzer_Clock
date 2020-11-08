@@ -45,7 +45,7 @@
  * */
 
 
-#include "Assets.h"
+#include "../../assets/Assets.h"
 
 // icon coords [x,y] = [(iconMap%16)*32, (iconMap/16)*32]
 enum SpriteSheetIcon {
@@ -121,8 +121,9 @@ enum SpriteSheetIcon {
   hourglass,                  nullicon
 };
 
-
+#ifdef DCF77_DO_WEATHER
 static SpriteSheetIcon lasticon1=nullicon, lasticon2=nullicon, lasticon3=nullicon;
+#endif
 
 struct UI_Icon {
   UI_Icon( uint16_t _x, uint16_t _y, SpriteSheetIcon _spriteSheetIcon ) : x(_x), y(_y), spriteSheetIcon(_spriteSheetIcon){ };

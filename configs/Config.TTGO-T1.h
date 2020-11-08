@@ -1,30 +1,31 @@
-#ifndef _CONFIG_H_WROVER_KIT
-#define _CONFIG_H_WROVER_KIT
+#ifndef _CONFIG_H_TTGO
+#define _CONFIG_H_TTGO
+
+#define DCFDisplay M5Display
+#include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
+#define tft M5.Lcd // syntax sugar
 
 // editable values
 
-#define UI_320x240
-//#define UI_160x128
+//#define UI_320x240
+#define UI_160x128
 #define displayRotation 1
-#define tftBrightness 255
-
-#define FORCED_WATCHED_COUNTRY "France" // Is le pays des frogs
-#define FORCED_WATCHED_CITY    "Paris"  // What a Seine-sational city!
+#define tftBrightness 128
+#define DCFDisplay M5Display
 
 // DCF77 from https://www.tindie.com/products/universalsolder/atomic-clock-am-receiver-kit-dcf77-wwvb-msf-jjy60/
-#define DCF77_pdnPort  35 // optional, DCF77 power down port
-#define DCF77_gainPort 34 // optional, DCF77 gain port
-#define DCF77PIN       39 // input  - DCF signal from antenna pcb. Pin must be an interrupt input!
+#define DCF77_pdnPort  26 // optional, DCF77 power down port
+#define DCF77_gainPort 32 // optional, DCF77 gain port
+#define DCF77PIN       21 // input  - DCF signal from antenna pcb. Pin must be an interrupt input!
 #define DCF77_DO_WEATHER  // handle weather data (comment this out to get rid of the text scroll and/or weather icons)
 
 // RTC module (DS1307) support, optional but strongly recommended
-#define DS1307_SDA     26
+#define DS1307_SDA     33
 #define DS1307_SCL     27
 #define DS1307_CTRL_ID 0x68
 
 #define USE_RTC
-//#define USE_BUTTONS
-#undef SPEAKER_PIN // disable speaker
+#define USE_BUTTONS
 
 // output baudrate to serial console
 #define SERIAL_SPEED 115200
@@ -63,4 +64,4 @@
 #define BEEPNOTE_BIT_LOW  NOTE_D3  // when the signal bit=0
 #define BEEPNOTE_ERROR    NOTE_DL1 // when an signal bit decoding error occurs
 
-#endif // _CONFIG_H_WROVER_KIT
+#endif // _CONFIG_H_TTGO

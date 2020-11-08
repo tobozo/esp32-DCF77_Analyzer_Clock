@@ -1,12 +1,15 @@
-#ifndef _CONFIG_H_TTGO
-#define _CONFIG_H_TTGO
+#ifndef _CONFIG_H_DEFAULT
+#define _CONFIG_H_DEFAULT
+
+#define DCFDisplay M5Display
+#include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
+#define tft M5.Lcd // syntax sugar
 
 // editable values
-
 //#define UI_320x240
 #define UI_160x128
 #define displayRotation 1
-#define tftBrightness 128
+#define tftBrightness 255
 
 // DCF77 from https://www.tindie.com/products/universalsolder/atomic-clock-am-receiver-kit-dcf77-wwvb-msf-jjy60/
 #define DCF77_pdnPort  26 // optional, DCF77 power down port
@@ -59,4 +62,4 @@
 #define BEEPNOTE_BIT_LOW  NOTE_D3  // when the signal bit=0
 #define BEEPNOTE_ERROR    NOTE_DL1 // when an signal bit decoding error occurs
 
-#endif // _CONFIG_H_TTGO
+#endif // _CONFIG_H_DEFAULT

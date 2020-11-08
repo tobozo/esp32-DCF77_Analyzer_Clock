@@ -1,175 +1,42 @@
 #ifndef _UI_H_
 #define _UI_H_
 
-//#define LGFX_ONLY
+#include "./Config.h"
 
-#ifndef LGFX_ONLY
-
-  // using ESP32-Chimera-Core device list
-
-  //#define LGFX_ONLY
-  //#undef LGFX_AUTODETECT
-  //#define LGFX_LOLIN_D32_PRO
-  #include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
-  #define tft M5.Lcd // syntax sugar
-  //#define Display320x240 // warn: 320x240 frame buffer may exceed available ram, use tft.setColorDepth( 8 )
-
-
-  void M5Begin()
+#ifdef USE_RTC
+  #include "modules/RTC/DS1307RTC.h" // a custom DS1307 library that returns time as a time_t
+  DS1307_RTC RTC;
+  static time_t RTCGet()
   {
+    return RTC.get();
+  }
+#else
+  #include <Time.h>
+  #include <TimeLib.h>
+#endif
 
+void M5Begin()
+{
+  #ifndef LGFX_ONLY
     if( SERIAL_SPEED != 115200 ) {
-      M5.begin(true, SD_ENABLE, false);
       Serial.begin( SERIAL_SPEED );
+      M5.begin(true, SD_ENABLE, false);
     } else {
       M5.begin();
     }
-
-    NVSUtils nvsUtils;
-
-    //nvsUtils.dumpNVS("AUTODETECT");
-    //nvsUtils.nvsdump( nullptr );
-
-  }
-
-
-#else
-
-  // bypassing LovyanGFX device detection
-
-  #include <LGFX_TFT_eSPI.hpp>
-  #include <Wire.h>
-
-  // Custom SD config
-  #include <SD.h>           // or SD_MMC.h, SPIFFS.h, LittleFS.h
-  #define M5STACK_SD SD     // or SD_MMC,   SPIFFS,   LittleFS
-  #define USE_TFCARD_CS_PIN // comment in/out if necessary
-  #define TFCARD_CS_PIN 13  // edit if necessary
-  //#define DisplayPanel lgfx::Panel_ST7735S
-  #define DisplayPanel lgfx::Panel_ILI9341
-  //#define Display320x240
-
-  // custom TFT config
-  struct LGFX_Config
-  {
-    // values picked from /LovyanGFX/src/config/
-    /*
-    // pinout TTGO_TS
-    static constexpr spi_host_device_t spi_host = VSPI_HOST;
-    static constexpr int dma_channel = 1;
-    static constexpr int spi_mosi = 23;
-    static constexpr int spi_miso = -1;
-    static constexpr int spi_sclk =  5;
-    */
-    // pinout LoLin D32Pro for ILI9341
-    static constexpr spi_host_device_t spi_host = VSPI_HOST;
-    static constexpr int dma_channel = 1;
-    static constexpr int spi_sclk = 18;
-    static constexpr int spi_mosi = 23;
-    static constexpr int spi_miso = 19;
-    static constexpr int spi_dlen = 8;
-  };
-  static DisplayPanel panel; // panel name picked from /LovyanGFX/src/lgfx/panel/
-  //typedef lgfx::LGFX_SPI<LGFX_Config> LGFX;
-  //static LGFX tft;
-
-  static lgfx::LGFX_SPI<LGFX_Config> tft;
-  //static LGFX tft;
-
-  #include <ESP32-Chimera-Core.h> // https://github.com/tobozo/ESP32-Chimera-Core or regular M5Stack Core
-
-  void M5Begin()
-  {
+  #else
     Serial.begin( SERIAL_SPEED );
     Serial.printf("Custom ESP32 started at %d bauds!", SERIAL_SPEED);
-
-    // custom TFT pinout
-    /*
-    // Panel_TTGO_TS panel, pinout picked from /LovyanGFX/src/lgfx/panel/
-    panel.freq_write = 20000000;
-    panel.panel_width  = 128;
-    panel.panel_height = 160;
-    panel.offset_x     = 2;
-    panel.offset_y     = 1;
-    panel.offset_rotation = 2;
-    panel.rgb_order = true;
-    panel.spi_3wire = true;
-    panel.spi_cs    = 16;
-    panel.spi_dc    = 17;
-    panel.gpio_rst  = 9;
-    panel.gpio_bl   = 27;
-    panel.pwm_ch_bl = 7;
-    */
-
-
-    // Panel pinout for LoLin D32Pro + ILI9341
-    panel.freq_write = 20000000;
-    panel.freq_fill  = 27000000;
-    panel.freq_read  = 16000000;
-    panel.spi_mode = 0;
-    panel.spi_mode_read = 0;
-    panel.len_dummy_read_pixel = 8;
-    panel.spi_read = true;
-    panel.spi_3wire = false;
-    panel.spi_cs = 14;
-    panel.spi_dc = 27;
-    panel.gpio_rst = 33;
-    panel.gpio_bl  = 32;
-    panel.pwm_ch_bl = 7;
-    panel.backlight_level = true;
-    panel.invert = false;
-    panel.rgb_order = false;
-    panel.memory_width  = 240;
-    panel.memory_height = 320;
-    panel.panel_width  = 240;
-    panel.panel_height = 320;
-    panel.offset_x = 0;
-    panel.offset_y = 0;
-    panel.rotation = 0;
-    panel.offset_rotation = 0;
-
+    setDisplayPins();
     tft.setPanel(&panel);
     tft.init();
+  #endif
+}
 
-
-    tft.drawRect(10,10,20,20,0xFFFF);
-    tft.print("BLAH");
-    delay(1000);
-
-    tft.clearScreen();
-
-    #if defined ( USE_TFCARD_CS_PIN ) && defined( TFCARD_CS_PIN )
-
-      log_d("Enabling SD from TFCARD_CS_PIN (%d)", TFCARD_CS_PIN);
-
-      M5STACK_SD.end();
-      SPI.end();
-      SPI.begin();
-      M5STACK_SD.begin(TFCARD_CS_PIN, SPI, 20000000);
-
-      if ( LGFX_Config::spi_host == HSPI_HOST ) {
-        tft.setSPIShared(false);
-      }
-    #else
-      log_d("Enabling SD_MMC");
-      M5STACK_SD.begin();
-      tft.setSPIShared(false);
-    #endif
-
-  }
-
-#endif
-
-
-
-#include "Config.h"
-#include "SpriteSheet.h"
-
+#include "modules/SpriteSheet/SpriteSheet.h"
 
 #ifdef DCF77_DO_WEATHER
   #include <Preferences.h>
-  //#include "NVS.h"
-  #include "nvs_flash.h"
   Preferences prefs;
   static int maxEntriesPerPage = 10;
   static int entriesIndex = -1;
@@ -178,14 +45,6 @@
   static unsigned long beforePicking = millis();
   String preferredCountry = "";
   String preferredCity    = "";
-
-#endif
-
-#ifdef USE_RTC
-  #include "DS1307RTC.h" // a custom DS1307 library that returns time as a time_t
-  DS1307RTC RTC;
-#else
-  #include <Time.h>
 #endif
 
 #ifdef USE_SPEAKER
@@ -213,6 +72,11 @@ struct TextStyle
   // constructor
   TextStyle( std::uint32_t _fore_rgb888, std::uint32_t _back_rgb888, float _size_x, float _size_y, textdatum_t _datum, bool _utf8, bool _cp437 ) :
     fore_rgb888( _fore_rgb888 ), back_rgb888( _back_rgb888 ), size_x( _size_x ), size_y( _size_y ), datum( _datum ), utf8( _utf8 ), cp437( _cp437 ) { }
+  void setFgColor( std::uint32_t color ) { fore_rgb888 = color;  }
+  void setBgColor( std::uint32_t color ) { back_rgb888 = color;  }
+  void setSizeX( float size ) { size_x = size; }
+  void setSizeY( float size ) { size_y = size; }
+  void setTextDatum( textdatum_t newdatum ) { datum = newdatum; }
 };
 
 struct FontStyle
@@ -237,7 +101,7 @@ struct BoxStyle
 
 
 // helper for setFontStyle
-void setTextStyle( M5Display *_tft, TextStyle *style )
+void setTextStyle( DCFDisplay *_tft, TextStyle *style )
 {
   lgfx::TextStyle myStyle; // why no constructor ??
   myStyle.fore_rgb888 = style->fore_rgb888;
@@ -250,7 +114,7 @@ void setTextStyle( M5Display *_tft, TextStyle *style )
   _tft->setTextStyle( myStyle );
 }
 
-void setFontStyle( M5Display *_tft, FontStyle *myFontStyle )
+void setFontStyle( DCFDisplay *_tft, FontStyle *myFontStyle )
 {
   _tft->setFont( myFontStyle->font );
   setTextStyle( _tft, myFontStyle->style );
@@ -279,15 +143,15 @@ void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle )
 
 
 #if defined UI_320x240
-  #include "UI_320x240.h"
+  #include "themes/UI_320x240.h"
 #elif defined UI_160x128
-  #include "UI_160x128.h"
+  #include "themes/UI_160x128.h"
 #else
   #error "Please define either UI_320x240 or UI_160x128"
 #endif
 
 
-#include "DCF77.h"
+#include "modules/DCF77/DCF77.h"
 
 
 static TFT_eSprite sprite = TFT_eSprite( &tft );
@@ -345,7 +209,9 @@ enum UIModes
   #ifdef DCF77_DO_WEATHER
   DCF_SETUP,
   #endif
-  COOK_TIMER // bonus ^^
+  #ifdef USE_BUTTONS
+  COOK_TIMER, // bonus ^^
+  #endif
 };
 
 UIModes UIMode = DCF_CLOCK;
@@ -390,8 +256,10 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
   *h = sprite->fontHeight();
 }
 
+#ifdef USE_BUTTONS
+  #include "modules/CookTimer/CookTimer.h"
+#endif
 
-#include "CookTimer.h"
 #include "Tasks.h"
 
 
@@ -570,6 +438,7 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
   }
 
 
+  __attribute__((unused))
   void updateScroll( String text )
   {
     scrollText = text;
@@ -827,63 +696,42 @@ void LedErrorStatus( byte lednum, int status )
 }
 
 
-void LeapSecondWarning() {
+void LeapSecondWarning()
+{
   takeMuxSemaphore();
   //TODO: manage coordinates and text styles from 320x240 and 160x128 profiles
-  sprite.setTextColor(TFT_RED, TFT_BLACK);//Brett
-  sprite.setCursor (105, 95);//Brett  across then down
-  sprite.print("Leap Sec Inserted"); // This uses the standard ADAFruit small font  //Brett
+
+  setFontStyle( &sprite, StatusFontStyle ); // centered / small font
+
+  sprite.setTextColor(TFT_RED, TFT_BLACK);
+  sprite.drawString("Leap Sec Inserted", tft.width()/2, 95 );
 
   // record date of last Leap Second on TFT
-  sprite.setTextColor(TFT_BLACK, TFT_BLACK);//Brett
-  sprite.setCursor (0, 170);//Brett  across then down
-  sprite.print("        "); // This uses the standard ADAFruit small font  //Brett
-  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
-  sprite.setCursor (0, 170);//Brett  across then down
-  sprite.print("Leap Sec"); // This uses the standard ADAFruit small font  //Brett
+  sprite.setTextColor(TFT_GREEN, TFT_BLACK);
+  sprite.drawString("Leap Sec", tft.width()/2, 170);
 
-  sprite.setTextColor(TFT_BLACK, TFT_BLACK);//Brett
-  sprite.setCursor (0, 180);//Brett  across then down
-  sprite.print("        "); // This uses the standard ADAFruit small font  //Brett
+  char timeStr[16];
+  sprintf( timeStr, TIME_FORMAT, hour(), minute(), bufferPosition +1 );
+  sprite.drawString( timeStr, tft.width()/2, 180 );
 
-  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
-  sprite.setCursor (0, 180);//Brett  across then down
-  sprite.print(hour()); // This uses the standard ADAFruit small font  //Brett
-  sprite.setCursor (12, 180);//Brett  across then down
-  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
-  sprite.setCursor (18, 180);//Brett  across then down
-  sprite.print(minute()); // This uses the standard ADAFruit small font  //Brett
-  sprite.setCursor (30, 180);//Brett  across then down
-  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
-  sprite.setCursor (36, 180);//Brett  across then down
-  sprite.print(bufferPosition +1); // This uses the standard ADAFruit small font  //Brett
+  char dateStr[16];
+  sprintf( dateStr, DATE_FORMAT, year(), month(), day() );
+  sprite.drawString( timeStr, tft.width()/2, 190 );
 
-  sprite.setTextColor(TFT_BLACK, TFT_BLACK);//Brett
-  sprite.setCursor (0, 190);//Brett  across then down
-  sprite.print("          "); // This uses the standard ADAFruit small font  //Brett
-
-  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
-  sprite.setCursor (0, 190);//Brett  across then down
-  sprite.print(day()); // This uses the standard ADAFruit small font  //Brett
-
-
-  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
-  sprite.setCursor (12, 190);//Brett  across then down
-  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
-
-  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
-  sprite.setCursor (18, 190);//Brett  across then down
-  sprite.print(month()); // This uses the standard ADAFruit small font  //Brett
-
-  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
-  sprite.setCursor (30, 190);//Brett  across then down
-  sprite.print(":"); // This uses the standard ADAFruit small font  //Brett
-
-  sprite.setTextColor(TFT_GREEN, TFT_BLACK);//Brett
-  sprite.setCursor (36, 190);//Brett  across then down
-  sprite.print(year()); // This uses the standard ADAFruit small font  //Brett
   giveMuxSemaphore();
+
+  // record Leap Second date and time on serial port
+  Serial.printf( "Leap Second Inserted %02d:%02d:%02d 20%02d/%02d/%02d ]\n",
+    dcfHour,
+    dcfMinute,
+    bufferPosition +1,
+    dcfYear,
+    dcfMonth,
+    dcfDay
+  );
+
 }
+
 
 
 
@@ -922,7 +770,7 @@ void drawWeekDays( int daynum )
       }
       sprite.setTextColor( TFT_GRAY );
     }
-    sprite.drawChar( weekStr[pos],  hpos+boxCenterX+LedWeekStatusMarginX, vpos+boxCenterY+LedWeekStatusMarginY );//Brett move weekday text left right -x   down and up -y
+    sprite.drawChar( weekStr[pos],  hpos+boxCenterX+LedWeekStatusMarginX, vpos+boxCenterY+LedWeekStatusMarginY );
     hpos += boxWidth;
   }
 
@@ -931,51 +779,9 @@ void drawWeekDays( int daynum )
 
 #ifdef DCF77_DO_WEATHER
 
-static const char weatherBitsStatusStr[] = "123";
 
-static const String weatherBitsStr[3] = { "110", "101", "011" };
 
-void LedWeatherStatus( int bitnumber, int bitstatus, bool echo = true )
-{
 
-  int bitposition = 0;
-
-  setFontStyle( &sprite, LedWeekStatusFontStyle );
-
-  switch( bitnumber ) {
-    case 0: bitposition = 2; if( echo ) Serial.println( "Received Meteo Bits 29-42" ); break;
-    case 1: bitposition = 0; if( echo ) Serial.println( "Received Meteo Bits 01-14" );  break;
-    case 2: bitposition = 1; if( echo ) Serial.println( "Received Meteo Bits 15-28" ); break;
-    default: log_e("Invalid meteo bit index !!"); return;
-  }
-
-  switch( bitstatus ) {
-    case -1: sprite.setTextColor( TFT_RED ); if( echo ) log_w("weather data couldn't be decrypted/uncompressed"); break;
-    case  0: sprite.setTextColor( TFT_GRAY );/* grey */ break;
-    case  1: sprite.setTextColor( TFT_GREEN );/* green */ break;
-    default: log_e("Invalid meteo bit status !!");
-  }
-
-  int hpos = 0; // left aligned
-  int vpos = sprite.height(); // bottom aligned
-  int margin = 1;
-
-  for( int i=0;i<3;i++) {
-    getTextBounds( &sprite, weatherBitsStr[i].c_str(), &tmpFontWidth, &tmpFontHeight );
-    int boxCenterX = /*(tmpFontWidth/2)+*/margin;
-    int boxCenterY = (tmpFontHeight/2)-margin;
-    if( bitposition == 0 ) {
-      // resetting, process all
-      sprite.drawString( weatherBitsStr[i], hpos+boxCenterX, (vpos-tmpFontHeight)+boxCenterY );
-      if( i==0 ) sprite.setTextColor( TFT_GRAY );
-    } else {
-      // updating, process one
-      if( bitposition == i ) sprite.drawString( weatherBitsStr[i], hpos+boxCenterX, (vpos-tmpFontHeight)+boxCenterY );
-    }
-    hpos += tmpFontWidth;
-  }
-
-}
 
 #endif
 
@@ -1241,13 +1047,14 @@ void displayRtcDate()
   sprite.drawString( dateStr, TFT_HALFWIDTH, RTCDateYPos );
   giveMuxSemaphore();
 
-  uint16_t fontHeight = sprite.fontHeight();
-  uint16_t textWidth = tft.textWidth( dateStr );
-
-  timerBox.width  = textWidth  > timerBox.width  ? textWidth  : timerBox.width;
-  timerBox.height = fontHeight > timerBox.height ? fontHeight : timerBox.height;
-  timerBox.x      = TFT_HALFWIDTH - timerBox.width/2;
-  timerBox.y      = RTCDateYPos - timerBox.height/2;
+  #ifdef USE_BUTTONS
+    uint16_t fontHeight = sprite.fontHeight();
+    uint16_t textWidth = tft.textWidth( dateStr );
+    timerBox.width  = textWidth  > timerBox.width  ? textWidth  : timerBox.width;
+    timerBox.height = fontHeight > timerBox.height ? fontHeight : timerBox.height;
+    timerBox.x      = TFT_HALFWIDTH - timerBox.width/2;
+    timerBox.y      = RTCDateYPos - timerBox.height/2;
+  #endif
 }
 
 
@@ -1289,6 +1096,68 @@ void scheduleBuzz( uint16_t note, int duration )
 
 
 #ifdef DCF77_DO_WEATHER
+
+
+  static const char weatherBitsStatusStr[] = "123";
+
+  static const String weatherBitsStr[3] = { "110", "101", "011" };
+
+  void LedWeatherStatus( int bitnumber, int bitstatus, bool echo = true )
+  {
+
+    int bitposition = 0;
+
+    setFontStyle( &sprite, LedWeekStatusFontStyle );
+
+    switch( bitnumber ) {
+      case 0: bitposition = 2; if( echo ) Serial.println( "Received Meteo Bits 29-42" ); break;
+      case 1: bitposition = 0; if( echo ) Serial.println( "Received Meteo Bits 01-14" );  break;
+      case 2: bitposition = 1; if( echo ) Serial.println( "Received Meteo Bits 15-28" ); break;
+      default: log_e("Invalid meteo bit index !!"); return;
+    }
+
+    switch( bitstatus ) {
+      case -1: sprite.setTextColor( TFT_RED ); if( echo ) log_w("weather data couldn't be decrypted/uncompressed"); break;
+      case  0: sprite.setTextColor( TFT_GRAY );/* grey */ break;
+      case  1: sprite.setTextColor( TFT_GREEN );/* green */ break;
+      default: log_e("Invalid meteo bit status !!");
+    }
+
+    int hpos = 0; // left aligned
+    int vpos = sprite.height(); // bottom aligned
+    int margin = 1;
+
+    for( int i=0;i<3;i++) {
+      getTextBounds( &sprite, weatherBitsStr[i].c_str(), &tmpFontWidth, &tmpFontHeight );
+      int boxCenterX = /*(tmpFontWidth/2)+*/margin;
+      int boxCenterY = (tmpFontHeight/2)-margin;
+      if( bitposition == 0 ) {
+        // resetting, process all
+        sprite.drawString( weatherBitsStr[i], hpos+boxCenterX, (vpos-tmpFontHeight)+boxCenterY );
+        if( i==0 ) sprite.setTextColor( TFT_GRAY );
+      } else {
+        // updating, process one
+        if( bitposition == i ) sprite.drawString( weatherBitsStr[i], hpos+boxCenterX, (vpos-tmpFontHeight)+boxCenterY );
+      }
+      hpos += tmpFontWidth;
+    }
+
+  }
+
+
+  void printWatchedCity( bool detected = false )
+  {
+    takeMuxSemaphore();
+    setFontStyle( &sprite, StatusFontStyle ); // centered / small font
+    if( detected ) {
+      sprite.setTextColor(TFT_GREEN, TFT_BLACK);
+    } else {
+      sprite.setTextColor(TFT_ORANGE, TFT_BLACK);
+    }
+    sprite.drawString( watchedCity, tft.width()/2, 165 ); // This uses the standard ADAFruit small font
+    giveMuxSemaphore();
+  }
+
 
   char countryCityHolder[64];
   //int citiesLength = 0;
@@ -1491,9 +1360,9 @@ void initSpeaker()
 }
 
 
+#ifdef USE_RTC
 void initRTC()
 {
-  #ifdef USE_RTC
     Wire.begin( DS1307_SDA, DS1307_SCL );
     #ifdef _CHIMERA_CORE_
       M5.I2C.scan();
@@ -1502,7 +1371,7 @@ void initRTC()
     // Later RTC will be synced with DCF time
     RTC.begin( DS1307_SDA, DS1307_SCL );
     //delay(10);
-    setSyncProvider( RTC.get );   // the function to get the time from the RTC
+    setSyncProvider( RTCGet );   // the function to get the time from the RTC
     //delay(500);
     // check if RTC has set the system time
     if ( timeStatus() != timeSet ) { // Unable to sync with the RTC - activate RTCError LED
@@ -1516,8 +1385,15 @@ void initRTC()
       LedErrorStatus( LED_RTCERROR, LOW );
       log_d( "hh:mm:ss: %02d:%02d:%02d", hour(), minute(), second() );
     }
-  #endif
 }
+void setRTC( unsigned long nowtime)
+{
+  takeMuxSemaphore();
+  RTC.set( nowtime );
+  giveMuxSemaphore();
+  log_w( "RTC and internal clock adjusted to 20%02d:%02d:%02d %02d:%02d:00", dcfYear, dcfMonth, dcfDay, dcfHour, dcfMinute );
+}
+#endif
 
 
 static void InitUI()
@@ -1599,13 +1475,13 @@ static void InitUI()
 
   setFontStyle( &sprite, LedParityStatusFontStyle );
   getTextBounds( &sprite, "011001010 P", &tmpFontWidth, &tmpFontHeight );
-  sprite.fillRect( 0,                                       tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
-  sprite.fillRect( tmpFontWidth - LedParityStatusFontWidth, tft.height() - (LedParityStatusFontHeight + 2), LedParityStatusFontWidth + 2,            LedParityStatusFontHeight+1, TFT_ORANGE);
+  sprite.fillRect( 0, tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
+  sprite.fillRect( tmpFontWidth - LedParityStatusFontWidth, tft.height() - (LedParityStatusFontHeight + 2), LedParityStatusFontWidth + 2, LedParityStatusFontHeight+1, TFT_ORANGE);
   sprite.setTextColor( TFT_DARKGRAY );
   sprite.drawString( "011001010 P", 1, tft.height() - (LedParityStatusFontHeight + 1)  );
   #ifdef DCF77_DO_WEATHER
     // clear area from dummy text
-    sprite.fillRect( 0,                                       tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
+    sprite.fillRect( 0, tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
   #endif
 
 /*
@@ -1766,7 +1642,9 @@ void initialize(void)
   }
 
   initSpeaker();
-  initRTC();
+  #ifdef USE_RTC
+    initRTC();
+  #endif
   if ( PERFORM_LED_TEST == 1 ) {
     LedTest();
   }

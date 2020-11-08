@@ -1,7 +1,7 @@
 #ifndef _TASKS_H_
 #define _TASKS_H_
 
-#include "Config.h"
+//#include "Config.h"
 
 // called from here but loaded later from UI.h
 extern void checkButtons( void );
@@ -200,7 +200,6 @@ static void timerTasks( void *param ) {
   #ifdef DCF77_DO_WEATHER
     //initScroll();
   #endif
-  byte lastPushCounter = 0;
   String decoderStatusStr = "  Minute Marker   ";
   while(1) {
     if ( second() != previousSecond ) {
@@ -253,19 +252,27 @@ static void timerTasks( void *param ) {
       vTaskDelay( 20 );
       continue;
     }
-    if( UIMode == COOK_TIMER ) {
-      cookTimerloop();
-    } else {
-      #ifdef DCF77_DO_WEATHER
-      if( weatherReady ) {
-        showWeather();
-        weatherReady = false;
-      }
+
+    switch( UIMode )
+    {
+      #ifdef USE_BUTTONS
+        case COOK_TIMER:
+          cookTimerloop();
+        break;
       #endif
+      default:
+        #ifdef DCF77_DO_WEATHER
+        if( weatherReady ) {
+          showWeather();
+          weatherReady = false;
+        }
+        #endif
+      break;
     }
+
+    #ifdef USE_BUTTONS
     if( lastPushCounter != longPushCounter ) {
       lastPushCounter = longPushCounter;
-
       takeMuxSemaphore();
       if( longPushCounter == 0 ) {
         sprite.fillRect( sprite.width()-15, 30, 10, 31, TFT_BLACK );
@@ -273,8 +280,9 @@ static void timerTasks( void *param ) {
         sprite.fillRect( sprite.width()-15, 60-longPushCounter, 10, longPushCounter, TFT_BLUE );
       }
       giveMuxSemaphore();
-
     }
+    #endif
+
     // retrieve last buffer changes
 
 /*

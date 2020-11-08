@@ -1,7 +1,6 @@
 #ifndef _DCD77_H_
 #define _DCD77_H_
 
-#include "Config.h"
 #ifdef DCF77_DO_WEATHER
   #include "DCF77_Weather.h" // Weather data support
 #endif
@@ -71,9 +70,11 @@ int leapSecBit = 0; // value of leap second bit (should be 0)
 #define DisplayPeriodPulse    3
 
 
+#ifdef USE_SPEAKER
 // beed tones
 static uint16_t willBuzzNote;
 static int willBuzzDuration;
+#endif
 
 // Pulse flanks
 //static unsigned long flankTime    = 0;
@@ -153,6 +154,9 @@ extern void setRingLed( uint8_t ringNum, uint8_t ledNum, bool enable, bool clear
 extern void LedParityStatus( uint8_t paritynum, int status );
 extern void LedDCFStatus( int status );
 extern void clearRing( uint8_t ringNum );
+#ifdef USE_RTC
+extern void setRTC( unsigned long nowtime );
+#endif
 
 
 void copyBuffer();
@@ -350,8 +354,6 @@ void processDcfBit( int dcfBit ) {
 
   if ( bufferPosition == 19 ) {
     leapSecond = dcfBit;
-    // Serial.print("leapSecond = ");//Brett
-    // Serial.println(leapSecond);//Brett
   }
 
   // ----------------------------------------
@@ -433,31 +435,14 @@ void processDcfBit( int dcfBit ) {
     dcfParityCheckP1 + dcfParityCheckP2 + dcfParityCheckP3 == 3 ? dcfValidSignal = true : dcfValidSignal = false;
   }
 
-  // Brett Leap Second We are here because an extra bit has been detected could be a leap second so record the value
+  // Leap Second: We are here because an extra bit has been detected could be a leap second so record the value
   if ( bufferPosition == 59 ) {
     leapSecBit = dcfBit;
   }
 
   if ( bufferPosition == 59 && lastDcfValidSignal == true && leapSecond == 1 && dcfMinute ==59 && leapSecBit == 0 ) {
-    //add leap second warning on TFT
-
+    //add leap second warning on TFT and Serial
     LeapSecondWarning();
-
-    // record Leap Second date and time on serial port
-    Serial.print("Leap Second Inserted ");//Brett
-      Serial.print( dcfHour );
-      Serial.print( "0" );
-      Serial.print( ":" );
-      Serial.print( dcfMinute );
-      Serial.print( ":" );
-      Serial.print( bufferPosition +1 );
-      //Serial.print( second() );
-      Serial.print( " " );
-      Serial.print( dcfDay );
-      Serial.print( "/" );
-      Serial.print( dcfMonth );
-      Serial.print( "/" );
-      Serial.println( dcfYear );
   }
 
   //--------------------------------------------------------------------
@@ -528,23 +513,20 @@ void finalizeBuffer( void ) {
   // Now check if it correspondends with the buffer counter
   // 'bufferPosition' which should be value 59
   //--------------------------------------------------------------------
-  if ( lastBufferPosition == 60 && lastDcfValidSignal == true && leapSecond == 1 && dcfMinute ==59 && leapSecBit == 0 ) {  //Brett Leap Second checks
+  if ( lastBufferPosition == 60 && lastDcfValidSignal == true && leapSecond == 1 && dcfMinute ==59 && leapSecBit == 0 ) {
     // process buffer and extract data sync the time with the RTC
     decodeBufferContents();
     // set Arduino time and after that set RTC time
     setTime( dcfHour, dcfMinute, 0, dcfDay, dcfMonth, dcfYear );
     #ifdef USE_RTC
-      takeMuxSemaphore();
-      RTC.set(now());
-      giveMuxSemaphore();
-      log_d( "RTC and internal clock adjusted to 20%02d:%02d:%02d %02d:%02d:00", dcfYear, dcfMonth, dcfDay, dcfHour, dcfMinute );
+      setRTC( now() );
     #endif
     // bufferPosition == 59 so turn Buffer Full LED ON
     LedErrorStatus( LED_BUFFERFULL, HIGH );
     // Turn DCF OK LED ON
     LedDCFStatus( true );
     // copy 'contents' of inner LED ring to the outer LED ring (current time information)
-    for ( uint8_t r = 0; r < 60; r++ ) {//Brett Leap Second (60 bits) over
+    for ( uint8_t r = 0; r < 60; r++ ) {
       setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1, false );
       // Reset inner LED ring (incoming time information)
       setRingLed( LedRingInner, r, false );
@@ -557,7 +539,7 @@ void finalizeBuffer( void ) {
     //bufferPosition   = 0;
     // reset flag
     MinuteMarkerFlag = false;
-  } else if( lastBufferPosition == 59 && lastDcfValidSignal == true ) {// Brett Leap Second changed to else if
+  } else if( lastBufferPosition == 59 && lastDcfValidSignal == true ) {
     // process buffer and extract data sync the time with the RTC
     decodeBufferContents();
     // set Arduino time and after that set RTC time
@@ -565,26 +547,22 @@ void finalizeBuffer( void ) {
     setTime( dcfHour, dcfMinute, 0, dcfDay, dcfMonth, dcfYear );
   // Serial.println("leap sec error here 01");
     #ifdef USE_RTC
-      takeMuxSemaphore();
-      RTC.set(now());
-      giveMuxSemaphore();
-      log_w( "RTC and internal clock adjusted to 20%02d:%02d:%02d %02d:%02d:00", dcfYear, dcfMonth, dcfDay, dcfHour, dcfMinute );
+      setRTC( now() );
     #endif
     // bufferPosition == 59 so turn Buffer Full LED ON
     LedErrorStatus( LED_BUFFERFULL, HIGH );
     // Turn DCF OK LED ON
     LedDCFStatus( true );
 
-    setRingLed( LedRingOuter, 59, false );// Brett leap second clear any left over leap second marks
-    setRingLed( LedRingInner, 59, false );// Brett leap second clear any left over leap second marks
+    setRingLed( LedRingOuter, 59, false );
+    setRingLed( LedRingInner, 59, false );
     // copy 'contents' of inner LED ring to the outer LED ring (current time information)
-    for ( uint8_t r = 0; r < 59; r++ ) {//Brett 0 to 58 copied - non Leap Second don't copy leap second mark on 59
-    setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1, false );//copy
+    for ( uint8_t r = 0; r < 59; r++ ) {
+      setRingLed( LedRingOuter, r, DCFbitFinalBuffer[r] == 1, false );//copy
       // Reset inner LED ring (incoming time information)
       setRingLed( LedRingInner, r, false );//delete 0-58 LED 59 cleared above
       // Reset array, positions 0-58 (=59 bits)
       //DCFbitBuffer[r] = 0;
-
     }
     // activate Synced LED
     LedErrorStatus( LED_RTCSYNC, HIGH );

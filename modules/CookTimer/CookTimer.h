@@ -1,4 +1,3 @@
-
 #include <Time.h>
 
 
@@ -21,6 +20,7 @@ bool changed = false;
 
 uint8_t currentState = CNT_IDLE_MAX;
 static byte longPushCounter = 0;
+static byte lastPushCounter = 0;
 
 //static void InitUI();
 static void displayRtcDate();

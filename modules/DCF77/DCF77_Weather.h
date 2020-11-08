@@ -18,6 +18,7 @@ int binStrToDec( String input );
 extern int dcfDST, dcfMinute, dcfHour;
 static void updateScroll( String text );
 static void updateIcons( SpriteSheetIcon icon1, SpriteSheetIcon icon2, SpriteSheetIcon icon3 );
+static void printWatchedCity( bool detected );
 static bool weatherReady = false;
 static int dcfWeatherBitNum, dcfWeatherDecodeStatus;
 
@@ -1619,25 +1620,12 @@ void showWeather() {
   if(  ( twodayforecast <=90 && strcmp( cities[twodayforecast].name, watchedCity ) == 0 )
     || ( fourdayforecast<=90 && strcmp( cities[fourdayforecast].name, watchedCity ) == 0)
   ) {
-    Serial.println("City match, should update scroll and icons !!");
-    Serial.print("Watched city detected ");//Brett
-    Serial.println(watchedCity);//Brett
-    Serial.println("");//Brett
-    //TODO: sprite this
-    // tft.setTextColor(ILI9341_GREEN, ILI9341_BLACK);//Brett
-    // tft.setCursor (143, 165);//Brett  across then down
-    // tft.print(watchedCity); // This uses the standard ADAFruit small font  //Brett
+    Serial.printf("Watched city detected %s\n", watchedCity );
+    printWatchedCity( true );
     updateIcons( icon1, icon2, icon3 );
   } else {
-    //Serial.println("Forecast for this country+city will not be displayed");
-    Serial.print("Watched city is set to ");//Brett
-    Serial.println(watchedCity);//Brett
-    Serial.println("");//Brett
-    // Serial.println("No City match, weather icons off");//Brett3
-    //TODO: sprite this
-    //tft.setTextColor(ILI9341_GREEN, ILI9341_BLACK);//Brett
-    //tft.setCursor (143, 165);//Brett  across then down
-    //tft.print(watchedCity); // This uses the standard ADAFruit small font  //Brett
+    Serial.printf("Watched city is set to %s\n", watchedCity );
+    printWatchedCity( false );
   }
 
 }

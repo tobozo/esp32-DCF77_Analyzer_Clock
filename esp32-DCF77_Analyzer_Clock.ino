@@ -156,8 +156,7 @@
 
 */
 
-#include "Config.h"
-#include "UI.h" // TFT Support for Clock Analyzer + JPEG/Adafruit layer
+#include "UI.h" // TFT Support for Clock Analyzer + JPEG/LGFX layer
 
 void loop() {
   vTaskSuspend( NULL );

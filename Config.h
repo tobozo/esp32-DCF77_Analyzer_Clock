@@ -1,19 +1,20 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
+// enable either one or none of those:
 
 #define CONFIG_WROVER_KIT
 //#define CONFIG_TTGO // default
 //#define CONFIG_BRETT
 
 #if defined CONFIG_WROVER_KIT
-  #include "Config.WROVER_KIT.h"
+  #include "configs/Config.WROVER_KIT.h"
 #elif defined CONFIG_TTGO
-  #include "Config.TTGO-T1.h"
+  #include "configs/Config.TTGO-T1.h"
 #elif defined CONFIG_BRETT
-  #include "Config.Brett.h"
+  #include "configs/Config.Brett.h"
 #else
-  #include "Config.Default.h"
+  #include "configs/Config.Default.h"
 #endif
 
 #if defined SPEAKER_PIN

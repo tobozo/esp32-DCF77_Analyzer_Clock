@@ -1,5 +1,12 @@
+#ifndef DS1307RTC_h
+#define DS1307RTC_h
+
+#include <Wire.h>
+#include <Time.h>
+#include <TimeLib.h>
+
 /*
- * DS1307RTC.h - library for DS1307 RTC
+ * DS1307RTC.h - library for DS1307 RTC, the shittiest RTC library ever
 
   Copyright (c) Michael Margolis 2009
   This library is intended to be uses with Arduino Time.h library functions
@@ -21,16 +28,29 @@
   30 Dec 2009 - Initial release
   5 Sep 2011 updated for Arduino 1.0
   15 Aug 2018 removed constructor and implemented begin()
+  7 Nov 2020 moved cpp code to header file after compilation hell
  */
 
-#include <Wire.h>
-#include "DS1307RTC.h"
+class DS1307_RTC {
+  public:
+    void begin( uint8_t sdaPin, uint8_t sclPin );
+    uint8_t isrunning( void );
+    time_t get();
+    void set( time_t t );
+    bool read( tmElements_t &tm );
+    bool write( const tmElements_t& dt );
+    bool chipPresent() { return exists; }
+  private:
+    bool exists = false;
+    uint8_t dec2bcd( uint8_t num );
+    uint8_t bcd2dec( uint8_t num );
+};
 
-DS1307RTC::DS1307RTC() {
-  // Wire.begin();
-}
 
-void DS1307RTC::begin( uint8_t sdaPin, uint8_t sclPin ) {
+#define DS1307_CTRL_ID 0x68
+
+void DS1307_RTC::begin( uint8_t sdaPin, uint8_t sclPin )
+{
   if( sdaPin==0 || sclPin==0) {
     Wire.begin();
     log_d( "RTC begin SDA:%d, SCL:%d", sdaPin, sclPin );
@@ -41,7 +61,8 @@ void DS1307RTC::begin( uint8_t sdaPin, uint8_t sclPin ) {
 }
 
 
-uint8_t DS1307RTC::isrunning( void ) {
+uint8_t DS1307_RTC::isrunning( void )
+{
   Wire.beginTransmission( DS1307_CTRL_ID );
   Wire.write( (int)0 );
   Wire.endTransmission();
@@ -51,7 +72,7 @@ uint8_t DS1307RTC::isrunning( void ) {
 }
 
 // PUBLIC FUNCTIONS
-time_t DS1307RTC::get()   // Aquire data from buffer and convert to time_t
+time_t DS1307_RTC::get()   // Aquire data from buffer and convert to time_t
 {
   tmElements_t tm;
   if ( read(tm) == false ) {
@@ -61,7 +82,8 @@ time_t DS1307RTC::get()   // Aquire data from buffer and convert to time_t
   return( makeTime(tm) );
 }
 
-void DS1307RTC::set( time_t t ) {
+void DS1307_RTC::set( time_t t )
+{
   tmElements_t tm;
   breakTime( t, tm );
   tm.Second |= 0x80;  // stop the clock
@@ -70,9 +92,9 @@ void DS1307RTC::set( time_t t ) {
   write( tm );
 }
 
-
 // Aquire data from the RTC chip in BCD format
-bool DS1307RTC::read( tmElements_t &tm ) {
+bool DS1307_RTC::read( tmElements_t &tm )
+{
   uint8_t sec;
   Wire.beginTransmission( DS1307_CTRL_ID );
   Wire.write( (int)0 );
@@ -99,7 +121,8 @@ bool DS1307RTC::read( tmElements_t &tm ) {
 }
 
 
-bool DS1307RTC::write( const tmElements_t& dt ) {
+bool DS1307_RTC::write( const tmElements_t& dt )
+{
   //dumpTime("RTC Will adjust from tmElements_t ", dt );
   Wire.beginTransmission( DS1307_CTRL_ID );
   Wire.write( (int)0 );
@@ -123,16 +146,15 @@ bool DS1307RTC::write( const tmElements_t& dt ) {
 // PRIVATE FUNCTIONS
 
 // Convert Decimal to Binary Coded Decimal (BCD)
-uint8_t DS1307RTC::dec2bcd( uint8_t num ) {
+uint8_t DS1307_RTC::dec2bcd( uint8_t num )
+{
   return ( (num/10 * 16) + (num % 10) );
 }
 
 // Convert Binary Coded Decimal (BCD) to Decimal
-uint8_t DS1307RTC::bcd2dec(uint8_t num) {
+uint8_t DS1307_RTC::bcd2dec(uint8_t num)
+{
   return ( (num/16 * 10) + (num % 16) );
 }
 
-bool DS1307RTC::exists = false;
-
-//DS1307RTC RTC = DS1307RTC(); // create an instance for the user
-                               // and a hell for the developer
+#endif

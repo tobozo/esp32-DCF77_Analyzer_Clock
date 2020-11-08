@@ -16,13 +16,13 @@
 #define TFT_DARKRED   tft.color565( 0xBB, 0x00, 0x00 )
 #define TFT_GREENISH  tft.color565( 0x00, 0xdd, 0x00 )
 
-static uint16_t DCFBitBufferYPos = 8;
+//static uint16_t DCFBitBufferYPos = 8;
 static uint16_t CETCESTYPos      = 209;
 static uint16_t LeapYearYpos     = 192;
 static uint16_t WeekNumberYpos   = 158;
-static uint16_t WeekDayNamesXpos = 259;
-static uint16_t WeekDayNamesYpos = 224;
-static uint16_t WeekDayLedYpos   = 216;
+//static uint16_t WeekDayNamesXpos = 259;
+//static uint16_t WeekDayNamesYpos = 224;
+//static uint16_t WeekDayLedYpos   = 216;
 static uint16_t MHDXPos[3]       = {0, 26, 44};
 static int16_t LedWeekStatusMarginX = -2;
 static int16_t LedWeekStatusMarginY = -9;
