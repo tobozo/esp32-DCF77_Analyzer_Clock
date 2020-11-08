@@ -1,7 +1,7 @@
 #ifndef _TASKS_H_
 #define _TASKS_H_
 
-#include "Config.h"
+//#include "Config.h"
 
 // called from here but loaded later from UI.h
 extern void checkButtons( void );
@@ -10,7 +10,9 @@ extern void handleScroll();
 extern void displayRtcTime();
 extern void displayRtcDate();
 extern void displayData( void );
-
+#ifdef DCF77_DO_WEATHER
+extern void saveWeatherCache();
+#endif
 
 void IRAM_ATTR int0handler() {
   DCFSignalState = digitalRead( DCF77PIN );
@@ -25,16 +27,17 @@ static void mainTask( void * param ) {
   attachInterrupt(digitalPinToInterrupt(DCF77PIN), int0handler, CHANGE);
   while( true ) {
     // check if pulse direction is changed (rising or falling)
+    vTaskDelay( 1 );
     if ( DCFSignalState != previousSignalState ) {
       previousSignalState = DCFSignalState; // 'reset' state of variable
       scanSignal(); // evaluate incoming pulse
     }
-    vTaskDelay( 1 );
+
   }
 }
 
 
-#ifdef SPEAKER_PIN
+#ifdef USE_SPEAKER
   static void soundTask( void * param ) {
     log_e( "Starting sound task" );
     while( true ) {
@@ -57,7 +60,7 @@ static void mainTask( void * param ) {
     log_e("Starting buttons task");
     while( true ) {
       checkButtons();
-      delay(50);
+      vTaskDelay(50);
       /*
       if( currentMode != UIMode ) {
         takeMuxSemaphore();
@@ -130,6 +133,11 @@ static void doMinutelyTask() {
     if( UIMode == DCF_CLOCK ) {
       displayData();
     }
+
+    //#ifdef DCF77_DO_WEATHER
+    //  saveWeatherCache();
+    //#endif
+
   }
 }
 /*
@@ -144,11 +152,13 @@ void tasksEveryMinute() {
 
 
 static void doHourlyTask() {
+  // reset error counter display
   errorCounter = 0;
-  // update error counter display
-  //if( UIMode == DCF_CLOCK ) {
-    LedDisplay( DisplayBufferBitError, "R", errorCounter );
-  //}
+  LedDisplay( DisplayBufferBitError, "R", errorCounter );
+
+  #ifdef DCF77_DO_WEATHER
+    saveWeatherCache();
+  #endif
 }
 
 void tasksEveryHour() {
@@ -186,15 +196,47 @@ void finalizeBufferTask( void *param ) {
 
 
 static void timerTasks( void *param ) {
-  log_w( "Entering timers task" );
+  log_d( "Entering timers task" );
   #ifdef DCF77_DO_WEATHER
     //initScroll();
   #endif
-  byte lastPushCounter = 0;
+  String decoderStatusStr = "  Minute Marker   ";
   while(1) {
     if ( second() != previousSecond ) {
       previousSecond = second();
       xTaskCreatePinnedToCore( secondlyTask, "secondlyTask", 2048, NULL, 1, NULL, 0 );
+
+      switch( previousSecond ) {
+        case  0:  decoderStatusStr = "  Minute Marker   "; break;
+        case  1:  decoderStatusStr = "    Meteo Data    "; break;
+        case  15: decoderStatusStr = "   Antenna Check  "; break;
+        case  16: decoderStatusStr = "    Summertime    "; break;
+        case  17: decoderStatusStr = "  CEST Summertime "; break;
+        case  18: decoderStatusStr = "  CET Wintertime  "; break;
+        case  19: decoderStatusStr = "    Leap Second   "; break;
+        case  20: decoderStatusStr = "Encoded Time Start"; break;
+        case  21: decoderStatusStr = "    Minute Data   "; break;
+        case  28: decoderStatusStr = "   Minute Parity  "; break;
+        case  29: decoderStatusStr = "     Hour Data    "; break;
+        case  35: decoderStatusStr = "    Hour Parity   "; break;
+        case  36: decoderStatusStr = "   Day of Month   "; break;
+        case  42: decoderStatusStr = "    Day of Week   "; break;
+        case  45: decoderStatusStr = "    Month Data    "; break;
+        case  50: decoderStatusStr = "    Year Data     "; break;
+        case  58: decoderStatusStr = "    Date Parity   "; break;
+      }
+
+      if( tft.width() >=320 ) {
+        //TODO: sprite this
+        takeMuxSemaphore();
+        setFontStyle( &sprite, StatusFontStyle );
+        sprite.setTextColor(TFT_GREEN, TFT_BLACK);
+        sprite.drawString( decoderStatusStr, tft.width()/2, 95);
+        giveMuxSemaphore();
+      } else {
+        log_w( "%s", decoderStatusStr.c_str() );
+      }
+
       vTaskDelay( 20 );
       continue;
     }
@@ -210,19 +252,27 @@ static void timerTasks( void *param ) {
       vTaskDelay( 20 );
       continue;
     }
-    if( UIMode == COOK_TIMER ) {
-      cookTimerloop();
-    } else {
-      #ifdef DCF77_DO_WEATHER
-      if( weatherReady ) {
-        showWeather();
-        weatherReady = false;
-      }
+
+    switch( UIMode )
+    {
+      #ifdef USE_BUTTONS
+        case COOK_TIMER:
+          cookTimerloop();
+        break;
       #endif
+      default:
+        #ifdef DCF77_DO_WEATHER
+        if( weatherReady ) {
+          showWeather();
+          weatherReady = false;
+        }
+        #endif
+      break;
     }
+
+    #ifdef USE_BUTTONS
     if( lastPushCounter != longPushCounter ) {
       lastPushCounter = longPushCounter;
-
       takeMuxSemaphore();
       if( longPushCounter == 0 ) {
         sprite.fillRect( sprite.width()-15, 30, 10, 31, TFT_BLACK );
@@ -230,8 +280,9 @@ static void timerTasks( void *param ) {
         sprite.fillRect( sprite.width()-15, 60-longPushCounter, 10, longPushCounter, TFT_BLUE );
       }
       giveMuxSemaphore();
-
     }
+    #endif
+
     // retrieve last buffer changes
 
 /*
@@ -247,7 +298,7 @@ static void timerTasks( void *param ) {
     #endif
 
     takeMuxSemaphore();
-    sprite.pushSprite(0, 0, TFT_BLACK );
+    sprite.pushSprite(0, 0/*, TFT_BLACK*/ );
     giveMuxSemaphore();
 /*
     takeMuxSemaphore();
@@ -266,7 +317,7 @@ static void drawIcon( SpriteSheetIcon icon, uint16_t x, uint16_t y ) {
     vTaskDelay( 10 );
   }
   isrendering = true;
-  log_w("Icon #%d will be rendererd at [%d,%d] (%d in queue)", icon, x, y, needrendering );
+  log_d("Icon #%d will be rendererd at [%d,%d] (%d in queue)", icon, x, y, needrendering );
   takeMuxSemaphore();
   tft.fillRect( x, y, 32, 32, TFT_BLACK );
   //bool swap = sprite.getSwapBytes();
@@ -275,7 +326,7 @@ static void drawIcon( SpriteSheetIcon icon, uint16_t x, uint16_t y ) {
   giveMuxSemaphore();
   needrendering--;
   isrendering = false;
-  log_w("Icon #%d was rendererd !", icon );
+  log_d("Icon #%d was rendererd !", icon );
 }
 
 
@@ -303,7 +354,7 @@ static void setupTasks( void* params=NULL ) {
     xTaskCreatePinnedToCore( buttonsTask, "buttonsTask", 4096, NULL, 1, NULL, 0 );
     vTaskDelay( 10 );
   #endif
-  #ifdef SPEAKER_PIN
+  #ifdef USE_SPEAKER
     xTaskCreatePinnedToCore( soundTask,   "soundTask",   2048, NULL, 4, NULL, 0 );
     vTaskDelay( 10 );
   #endif
