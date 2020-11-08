@@ -29,6 +29,8 @@ CREDITS:
 
   Without the incredible work of these geniuses I would not have known where to start and how to write those credits :)
 
+  Huge thanks to [@BrettOliver](https://github.com/brettoliver) for fueling the code with a 320x240 UI, implementing the leap second, and [much more](http://www.brettoliver.org.uk/DCF77_Signal_Generator_Analyzer/DCF77_Signal_Generator.htm#leapsecond)
+
 Author:
 -------
   - https://github.com/tobozo/
