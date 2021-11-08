@@ -27,7 +27,7 @@ Running on an ODROID-GO:
 
   Thanks to the ESP32-Chimera-Core, the clock runs fine and flawless on an ODROID-GO (with sound output and buttons support for A/B/MENU).
   
-  <img src="https://raw.githubusercontent.com/dl9sec/esp32-DCF77_Analyzer_Clock/odroid-go/assets/img/OGO_esp32-DCF77_Analyzer_Clock.jpg" alt="ODROID-GO esp32-DCF77 Analyzer Clock" width="17%" height="17%">
+  <img src="https://raw.githubusercontent.com/tobozo/esp32-DCF77_Analyzer_Clock/master/assets/img/OGO_esp32-DCF77_Analyzer_Clock.jpg" alt="ODROID-GO esp32-DCF77 Analyzer Clock" width="17%" height="17%">
   
   The hardware components has to be connected to the ODROID-GO's 10-pin connector:
   
