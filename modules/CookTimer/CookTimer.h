@@ -1,4 +1,5 @@
-#include <Time.h>
+//#include <Time.h>
+#include <TimeLib.h>
 
 
 // button states (may be adjusted)
@@ -12,7 +13,7 @@
 #define CNT_DECREASING 0x02
 
 
-TFT_eSprite cookTimerSprite = TFT_eSprite( &tft );
+LGFX_Sprite cookTimerSprite = LGFX_Sprite( &tft );
 
 
 byte CookTimerButtonPos, CookTimerButtonLastPos;
@@ -169,7 +170,8 @@ void cookTimerStop() {
   takeMuxSemaphore();
   sprite_drawSpriteSheet( LogoSprite, atomic/*, ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 )*/ );
   sprite.fillRect( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, TFT_BLACK );
-  sprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
+  //sprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
+  LogoSprite.pushSprite( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ) );
   sprite.pushSprite( 0, 0/*, TFT_BLACK */);
   giveMuxSemaphore();
   displayRtcDate();
@@ -185,7 +187,8 @@ void cookTimerSetup() {
   takeMuxSemaphore();
   sprite_drawSpriteSheet( LogoSprite, hourglass/*, ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 )*/ );
   sprite.fillRect( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, TFT_BLACK );
-  sprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
+  //sprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
+  LogoSprite.pushSprite( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ) );
   sprite.pushSprite( 0, 0/*, TFT_BLACK */);
   giveMuxSemaphore();
 

@@ -11,7 +11,7 @@
     return RTC.get();
   }
 #else
-  #include <Time.h>
+  //#include <Time.h>
   #include <TimeLib.h>
 #endif
 
@@ -122,7 +122,7 @@ void setFontStyle( DCFDisplay *_tft, FontStyle *myFontStyle )
 
 
 // helper for setFontStyle
-void setTextStyle( TFT_eSprite *sprite, TextStyle *style )
+void setTextStyle( LGFX_Sprite *sprite, TextStyle *style )
 {
   lgfx::TextStyle myStyle; // why no constructor ??
   myStyle.fore_rgb888 = style->fore_rgb888;
@@ -135,7 +135,7 @@ void setTextStyle( TFT_eSprite *sprite, TextStyle *style )
   sprite->setTextStyle( myStyle );
 }
 
-void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle )
+void setFontStyle( LGFX_Sprite *sprite, FontStyle *myFontStyle )
 {
   sprite->setFont( myFontStyle->font );
   setTextStyle( sprite, myFontStyle->style );
@@ -154,14 +154,14 @@ void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle )
 #include "modules/DCF77/DCF77.h"
 
 
-static TFT_eSprite sprite = TFT_eSprite( &tft );
+static LGFX_Sprite sprite = LGFX_Sprite( &tft );
 
 #ifdef DCF77_DO_WEATHER
-  static TFT_eSprite ScrollSprite = TFT_eSprite( &tft );
+  static LGFX_Sprite ScrollSprite = LGFX_Sprite( &tft );
 #endif
-static TFT_eSprite MainSprite = TFT_eSprite( &tft );
-static TFT_eSprite MaskSprite = TFT_eSprite( &tft );
-static TFT_eSprite LogoSprite = TFT_eSprite( &tft );
+static LGFX_Sprite MainSprite = LGFX_Sprite( &tft );
+static LGFX_Sprite MaskSprite = LGFX_Sprite( &tft );
+static LGFX_Sprite LogoSprite = LGFX_Sprite( &sprite );
 
 static uint16_t TFT_HALFWIDTH;//    tft.width()/2
 static uint16_t TFT_HALFHEIGHT;//   tft.height()/2
@@ -230,7 +230,7 @@ UIModes UIMode = DCF_CLOCK;
   //static uint16_t scrollFontColorEnabled = TFT_GRAY;
 #endif
 
-//void sprite_drawJpg( TFT_eSprite *spr, int16_t x, int16_t y, const uint8_t * jpg_data, size_t jpg_len, uint16_t maxWidth, uint16_t maxHeight );
+//void sprite_drawJpg( LGFX_Sprite *spr, int16_t x, int16_t y, const uint8_t * jpg_data, size_t jpg_len, uint16_t maxWidth, uint16_t maxHeight );
 
 
 void tft_drawSpriteSheet( SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 )
@@ -240,7 +240,7 @@ void tft_drawSpriteSheet( SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 )
   tft.drawJpg( sprite_jpg, sprite_jpg_len, x, y, 32, 32, offsetx, offsety );
 }
 
-void sprite_drawSpriteSheet( TFT_eSprite &sprite, SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 )
+void sprite_drawSpriteSheet( LGFX_Sprite &sprite, SpriteSheetIcon icon, uint16_t x=0, uint16_t y=0 )
 {
   uint16_t offsetx = (icon%16)*32;
   uint16_t offsety = (icon/16)*32;
@@ -250,7 +250,7 @@ void sprite_drawSpriteSheet( TFT_eSprite &sprite, SpriteSheetIcon icon, uint16_t
   //log_e("done");
 }
 
-static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w, uint16_t *h )
+static void getTextBounds( LGFX_Sprite *sprite, const char *string, uint16_t *w, uint16_t *h )
 {
   *w = sprite->textWidth( string );
   *h = sprite->fontHeight();
@@ -472,7 +472,7 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
     giveMuxSemaphore();
 
     takeMuxSemaphore();
-    MaskSprite.pushImage( 0, -tft.height() / 2 + scrollHeight / 2, tft.width(), tft.height(), (const uint16_t*)sprite.frameBuffer(1)/*, TFT_BLACK*/ );
+    //MaskSprite.pushImage( 0, -tft.height() / 2 + scrollHeight / 2, tft.width(), tft.height(), (const uint16_t*)sprite.frameBuffer(1)/*, TFT_BLACK*/ );
     //MaskSprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
     //MaskSprite.pushImage( ( TFT_HALFWIDTH - 32 / 2 ), ( TFT_HALFHEIGHT - 32 / 2 ), 32, 32, (const uint16_t*)LogoSprite.frameBuffer(1) );
     MaskSprite.pushRotated( &ScrollSprite, 0/*, TFT_BLACK*/ );
@@ -483,7 +483,7 @@ static void getTextBounds( TFT_eSprite *sprite, const char *string, uint16_t *w,
     giveMuxSemaphore();
 
     takeMuxSemaphore();
-    MainSprite.pushImage( 0, tft.height() / 2 - scrollHeight / 2, tft.width(), scrollHeight, (const uint16_t*)ScrollSprite.frameBuffer(1)/*, TFT_BLACK*/);
+    //MainSprite.pushImage( 0, tft.height() / 2 - scrollHeight / 2, tft.width(), scrollHeight, (const uint16_t*)ScrollSprite.frameBuffer(1)/*, TFT_BLACK*/);
     giveMuxSemaphore();
     scrollPos -= scrollSpeed;
     if ( scrollPos <= -scrollWidth ) {
@@ -1117,9 +1117,9 @@ void scheduleBuzz( uint16_t note, int duration )
     }
 
     switch( bitstatus ) {
-      case -1: sprite.setTextColor( TFT_RED ); if( echo ) log_w("weather data couldn't be decrypted/uncompressed"); break;
-      case  0: sprite.setTextColor( TFT_GRAY );/* grey */ break;
-      case  1: sprite.setTextColor( TFT_GREEN );/* green */ break;
+      case -1: sprite.setTextColor( TFT_RED,   TFT_DARKGRAY ); if( echo ) log_w("weather data couldn't be decrypted/uncompressed"); break;
+      case  0: sprite.setTextColor( TFT_WHITE, TFT_DARKGRAY );/* grey */ break;
+      case  1: sprite.setTextColor( TFT_GREEN, TFT_DARKGRAY );/* green */ break;
       default: log_e("Invalid meteo bit status !!");
     }
 
@@ -1127,6 +1127,7 @@ void scheduleBuzz( uint16_t note, int duration )
     int vpos = sprite.height(); // bottom aligned
     int margin = 1;
 
+    //sprite.fillRect( 0, tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_DARKGRAY );
     for( int i=0;i<3;i++) {
       getTextBounds( &sprite, weatherBitsStr[i].c_str(), &tmpFontWidth, &tmpFontHeight );
       int boxCenterX = /*(tmpFontWidth/2)+*/margin;
@@ -1407,11 +1408,13 @@ static void InitUI()
 
   tft.fillScreen( TFT_BLACKISH );
 
-  if( tft.width()>=320 ) {
+  #if defined USE_PSRAM
+    // only do this if your DCF77 is far away, this messes up with signal decoding
     if( psramInit() ) {
-      //sprite.setPsram( true );
+      sprite.setColorDepth( 16 );
+      sprite.setPsram( true );
     }
-  }
+  #endif
 
   uint16_t* spritePtr = (uint16_t*)sprite.createSprite( tft.width(), tft.height() );
   if( spritePtr == NULL ) {
@@ -1475,13 +1478,13 @@ static void InitUI()
 
   setFontStyle( &sprite, LedParityStatusFontStyle );
   getTextBounds( &sprite, "011001010 P", &tmpFontWidth, &tmpFontHeight );
-  sprite.fillRect( 0, tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
+  sprite.fillRect( 0, tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_DARKGRAY );
   sprite.fillRect( tmpFontWidth - LedParityStatusFontWidth, tft.height() - (LedParityStatusFontHeight + 2), LedParityStatusFontWidth + 2, LedParityStatusFontHeight+1, TFT_ORANGE);
   sprite.setTextColor( TFT_DARKGRAY );
   sprite.drawString( "011001010 P", 1, tft.height() - (LedParityStatusFontHeight + 1)  );
   #ifdef DCF77_DO_WEATHER
     // clear area from dummy text
-    sprite.fillRect( 0, tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_LIGHTGRAY );
+    sprite.fillRect( 0, tft.height() - (LedParityStatusFontHeight + 2), tmpFontWidth - LedParityStatusFontWidth, LedParityStatusFontHeight+1, TFT_DARKGRAY );
   #endif
 
 /*

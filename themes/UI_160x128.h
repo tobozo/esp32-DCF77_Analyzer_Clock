@@ -100,8 +100,8 @@ FontStyle *StatusFontStyle = new FontStyle( &fonts::Font0, StatusTextStyle );
 
 void setTextStyle( M5Display *_tft, TextStyle *style );
 void setFontStyle( M5Display *_tft, FontStyle *myFontStyle );
-void setTextStyle( TFT_eSprite *sprite, TextStyle *style );
-void setFontStyle( TFT_eSprite *sprite, FontStyle *myFontStyle );
+void setTextStyle( LGFX_Sprite *sprite, TextStyle *style );
+void setFontStyle( LGFX_Sprite *sprite, FontStyle *myFontStyle );
 
 
 static const lgfx::U8g2font emoticon16( u8g2_font_unifont_t_emoticons );
@@ -122,10 +122,10 @@ int numDst = 0;
 int tt = 0;
 int mode = 0;
 
-TFT_eSprite morphSpriteFrom = TFT_eSprite( &tft );
-TFT_eSprite morphSpriteTo   = TFT_eSprite( &tft );
+LGFX_Sprite morphSpriteFrom = LGFX_Sprite( &tft );
+LGFX_Sprite morphSpriteTo   = LGFX_Sprite( &tft );
 
-void morph(TFT_eSprite *sprite, int32_t _x, int32_t _y, int mode )
+void morph(LGFX_Sprite *sprite, int32_t _x, int32_t _y, int mode )
 {
   int i,i0,i1,x,y;
   int n = max(numSrc,numDst);
@@ -144,7 +144,7 @@ void morph(TFT_eSprite *sprite, int32_t _x, int32_t _y, int mode )
 
 
 
-int genSpritePoints( byte *tab, int max, TFT_eSprite *sprite, char symbol )
+int genSpritePoints( byte *tab, int max, LGFX_Sprite *sprite, char symbol )
 {
   char str[2] = {symbol,'\0'};
   int pixelsOn = 0;
@@ -163,7 +163,7 @@ int genSpritePoints( byte *tab, int max, TFT_eSprite *sprite, char symbol )
 
 
 
-void morphLoop( TFT_eSprite *sprite, int32_t x, int32_t y, FontStyle *fstyle, char morphFrom, char morphTo )
+void morphLoop( LGFX_Sprite *sprite, int32_t x, int32_t y, FontStyle *fstyle, char morphFrom, char morphTo )
 {
 
   morphSpriteFrom.setColorDepth( 16 );
@@ -203,7 +203,7 @@ void morphLoop( TFT_eSprite *sprite, int32_t x, int32_t y, FontStyle *fstyle, ch
 void morphSprite()
 {
 
-  TFT_eSprite morphSprite = TFT_eSprite( &tft );
+  LGFX_Sprite morphSprite = LGFX_Sprite( &tft );
 
   morphSprite.setColorDepth( 16 );
   morphSprite.createSprite( 32, 32 );

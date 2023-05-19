@@ -653,7 +653,7 @@ void decodeBufferContents( void ) {
             forecastMinute = dcfMinute-1;
           }
           int forecastID = (((forecastHour) * 60) + (forecastMinute))  / 3; // zero indexed
-          setForecast( forecastID, forecastHour, forecastMinute, aInfo );
+          setForecast( forecastID, forecastHour, forecastMinute, aInfo ); // save in cache
         }
         weatherReady = true;
       } else {
